@@ -1,0 +1,5 @@
+Backends,URL
+copernicus-dataspace,https://openeo.dataspace.copernicus.eu/.well-known/openeo
+eodc,https://openeo.eodc.eu/.well-known/openeo
+openeo-platform,https://openeocloud.vito.be/.well-known/openeo
+vito,https://openeo.vito.be/.well-known/openeo

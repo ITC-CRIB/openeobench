@@ -1,0 +1,2 @@
+# Run openeo-checker.py every 10 minutes
+*/10 * * * * cd $HOME/openeo-checker && python3 openeo-checker.py -i api-endpoint.csv -o output.csv >> $HOME/openeo-checker/openeo_checker.log 2>&1
