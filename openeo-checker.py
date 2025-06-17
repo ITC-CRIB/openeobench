@@ -7,59 +7,45 @@ import argparse
 import sys
 import os
 import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 def check_url(url):
     """
     Send a request to the URL and measure response time.
-    Returns a tuple of (response_time, status)
+    Returns a tuple of (response_time, status, reason)
     """
     try:
         start_time = time.time()
         response = requests.get(url, timeout=30)
         end_time = time.time()
         response_time = round((end_time - start_time) * 1000, 2)  # Convert to ms and round to 2 decimal places
-        return response_time, response.status_code
+        return response_time, response.status_code, response.reason
     except requests.exceptions.Timeout:
-        return None, "Timeout"
-    except requests.exceptions.ConnectionError:
-        return None, "Connection Error"
+        return None, "Timeout", "Request timed out"
     except requests.exceptions.RequestException as e:
-        return None, f"Error: {str(e)}"
+        return None, "Request exception", str(e)
 
 def process_csv(input_file, output_file):
     """
     Process the input CSV file and append results to the output CSV file.
-    Only writes output after all URLs have been checked or if interrupted.
-    Records previous test results and includes testing time in the output.
+    Treats URLs in the input as base URLs and appends predefined endpoints to each.
+    Records HTTP response reasoning alongside the status code.
     Maintains a history of all test runs by appending new results to the output file.
     """
+    # Define list of endpoints to test for each base URL
+    endpoints = [
+        "/",                 # Root path
+        "/collections",      # OpenEO collections endpoint
+        "/processes",        # OpenEO processes endpoint
+    ]
+    
     results = []
-    previous_results = {}
-    existing_entries = []
-    testing_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # testing_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    testing_time = datetime.datetime.now().timestamp()
     
     try:
-        # Load previous results if output file exists
-        if os.path.exists(output_file):
-            try:
-                with open(output_file, 'r') as prev_file:
-                    prev_reader = csv.DictReader(prev_file)
-                    # Store all existing entries to preserve them
-                    existing_entries = list(prev_reader)
-                    
-                    # Get the most recent results for each backend/URL combination
-                    for row in existing_entries:
-                        if 'Backends' in row and 'URL' in row:
-                            key = f"{row['Backends']}:{row['URL']}"
-                            # Only update if this is a newer entry than what we have
-                            if key not in previous_results or ('Testing Time' in row and row['Testing Time']):
-                                previous_results[key] = {
-                                    'Response Time (ms)': row.get('Response Time (ms)'),
-                                    'Status': row.get('Status')
-                                }
-            except Exception as e:
-                print(f"Warning: Could not read previous results: {str(e)}")
+        # Check if output file exists and create it with headers if it doesn't
+        file_exists = os.path.exists(output_file)
         
         # Read input file and process URLs
         with open(input_file, 'r') as infile:
@@ -74,65 +60,58 @@ def process_csv(input_file, output_file):
             try:
                 for row in reader:
                     name = row['Backends']
-                    url = row['URL']
+                    base_url = row['URL'].rstrip('/')  # Remove trailing slash if present
                     
-                    # Validate URL
-                    parsed_url = urlparse(url)
+                    # Validate base URL
+                    parsed_url = urlparse(base_url)
                     if not parsed_url.scheme or not parsed_url.netloc:
                         result_entry = {
                             'Backends': name,
-                            'URL': url,
+                            'Base URL': base_url,
+                            'Endpoint': '',
+                            'Full URL': base_url,
                             'Response Time (ms)': None,
                             'Status': 'Invalid URL',
+                            'Reason': 'Invalid URL format',
                             'Testing Time': testing_time
                         }
-                        
-                        # Add previous results if available
-                        key = f"{name}:{url}"
-                        if key in previous_results:
-                            result_entry['Previous Response Time (ms)'] = previous_results[key]['Response Time (ms)']
-                            result_entry['Previous Status'] = previous_results[key]['Status']
-                            
                         results.append(result_entry)
                         continue
-                        
-                    print(f"Checking {name}: {url}")
-                    response_time, status = check_url(url)
                     
-                    result_entry = {
-                        'Backends': name,
-                        'URL': url,
-                        'Response Time (ms)': response_time,
-                        'Status': status,
-                        'Testing Time': testing_time
-                    }
-                    
-                    # Add previous results if available
-                    key = f"{name}:{url}"
-                    if key in previous_results:
-                        result_entry['Previous Response Time (ms)'] = previous_results[key]['Response Time (ms)']
-                        result_entry['Previous Status'] = previous_results[key]['Status']
+                    # Test each endpoint for this base URL
+                    for endpoint in endpoints:
+                        full_url = urljoin(base_url, endpoint)
+                        print(f"Checking {name}: {full_url}")
+                        response_time, status, reason = check_url(full_url)
                         
-                    results.append(result_entry)
+                        result_entry = {
+                            'Backends': name,
+                            'Base URL': base_url,
+                            'Endpoint': endpoint,
+                            'Full URL': full_url,
+                            'Response Time (ms)': response_time,
+                            'Status': status,
+                            'Reason': reason,
+                            'Testing Time': testing_time
+                        }
+                        results.append(result_entry)
+                        
             except KeyboardInterrupt:
                 print("\nProcess interrupted by user. Writing results collected so far...")
         
-        # Write all results to output file (append mode)
-        file_exists = os.path.exists(output_file) and os.path.getsize(output_file) > 0
+        # Define fieldnames for CSV
+        fieldnames = ['Backends', 'Base URL', 'Endpoint', 'Full URL', 'Response Time (ms)', 'Status', 'Reason', 'Testing Time']
         
-        with open(output_file, 'w', newline='') as outfile:
-            fieldnames = ['Backends', 'URL', 'Response Time (ms)', 'Status', 'Testing Time', 
-                         'Previous Response Time (ms)', 'Previous Status']
-            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-            writer.writeheader()
+        # Write results to output file - either create new file or append to existing
+        mode = 'a' if file_exists else 'w'
+        with open(output_file, mode, newline='') as outfile:
+            writer = csv.DictWriter(outfile, fieldnames=fieldnames, delimiter=';')
             
-            # First write all existing entries to preserve history
-            for entry in existing_entries:
-                # Ensure all entries have the same fields
-                row_data = {field: entry.get(field, '') for field in fieldnames}
-                writer.writerow(row_data)
+            # Write header only if creating a new file
+            if not file_exists:
+                writer.writeheader()
             
-            # Then write new results
+            # Write new results
             for result in results:
                 writer.writerow(result)
                 
