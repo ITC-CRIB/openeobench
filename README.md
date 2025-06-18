@@ -31,13 +31,13 @@ pip install requests
 ## Usage
 
 ```bash
-python openeo-checker.py -i <input_csv_file> -o <output_csv_file>
+python openeo-checker.py -i <input_csv_file> -o <output_directory>
 ```
 
 ### Arguments
 
 - `-i, --input`: Path to the input CSV file (required)
-- `-o, --output`: Path to the output CSV file (required)
+- `-o, --output`: Path to the output directory (required)
 
 ### Input CSV Format
 
@@ -54,25 +54,31 @@ eodc,https://openeo.eodc.eu/.well-known/openeo
 
 ### Output CSV Format
 
-The output CSV file will contain the following columns:
+The output CSV file will contain the following columns (semicolon-delimited):
 - `Backends`: Name of the OpenEO backend
 - `URL`: URL of the API endpoint
+- `Timestamp`: Unix timestamp of when the test was run
 - `Response Time (ms)`: Response time in milliseconds (if successful)
-- `Status`: HTTP status code or error message
+- `HTTP Code`: HTTP status code or error message
+- `Reason`: Reason phrase for the HTTP status or error description
+- `Valid`: Boolean indicating if the endpoint returned a valid JSON response with a success status code
+- `Body Size (bytes)`: Size of the response body in bytes
 
 ## Error Handling
 
 The script handles various error conditions:
-- Invalid URLs: Marked as "Invalid URL" in the status column
-- Timeouts: Marked as "Timeout" in the status column
-- Connection errors: Marked as "Connection Error" in the status column
-- Other request exceptions: Error message included in the status column
+- Invalid URLs: Marked as "Invalid URL" in the HTTP Code column with "Invalid URL format" in the Reason column
+- Timeouts: Marked as "Timeout" in the HTTP Code column with "Request timed out" in the Reason column
+- Connection errors: Marked as "Request exception" in the HTTP Code column with the specific error message in the Reason column
+- For HTTP error responses (4xx, 5xx), the script attempts to extract error messages from JSON responses when available
 
 ## Example
 
 ```bash
-python openeo-checker.py -i api-endpoint.csv -o results.csv
+python openeo-checker.py -i api-endpoint.csv -o output_directory
 ```
+
+This will create a CSV file in the specified output directory with the current date as part of the filename (e.g., `2025-06-18_OpenEO-Checker.csv`).
 
 ## License
 
