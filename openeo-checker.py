@@ -160,7 +160,7 @@ def main():
     # Get date in YYYY-MM-DD format
     date = datetime.datetime.now().strftime("%Y-%m-%d")
     # Create output file path
-    output_csv = os.path.join(output_dir, f"{date}_OpenEO-Checker.csv")
+    output_csv = os.path.join(output_dir, f"{date}.csv")
     
     process_csv(args.input, output_csv)
 
