@@ -65,6 +65,7 @@ def process_csv(input_file, output_file):
                         result_entry = {
                             'Backends': name,
                             'URL': base_url,
+                            'Testing Time': testing_time,
                             'Response Time (ms)': None,
                             'HTTP Code': 'Invalid URL',
                             'Reason': 'Invalid URL format',
@@ -79,6 +80,7 @@ def process_csv(input_file, output_file):
                     result_entry = {
                         'Backends': name,
                         'URL': base_url,
+                        'Testing Time': testing_time,
                         'Response Time (ms)': response_time,
                         'HTTP Code': status,
                         'Reason': reason,
@@ -90,7 +92,7 @@ def process_csv(input_file, output_file):
                 print("\nProcess interrupted by user. Writing results collected so far...")
         
         # Define fieldnames for CSV
-        fieldnames = ['Backends', 'URL', 'Response Time (ms)', 'HTTP Code', 'Reason', 'Valid']
+        fieldnames = ['Backends', 'URL', 'Testing Time', 'Response Time (ms)', 'HTTP Code', 'Reason', 'Valid']
         
         # Write results to output file - either create new file or append to existing
         mode = 'a' if file_exists else 'w'
