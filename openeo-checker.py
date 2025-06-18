@@ -22,11 +22,12 @@ def check_url(url):
         response_time = round((end_time - start_time) * 1000, 2)  # Convert to ms and round to 2 decimal places
         if response.status_code == 200:
             valid = True
-        return response_time, response.status_code, response.reason, valid
+        body_size = len(response.content)
+        return response_time, response.status_code, response.reason, valid, body_size
     except requests.exceptions.Timeout:
-        return None, "Timeout", "Request timed out", False
+        return None, "Timeout", "Request timed out", False, 0
     except requests.exceptions.RequestException as e:
-        return None, "Request exception", str(e), False
+        return None, "Request exception", str(e), False, 0
 
 def process_csv(input_file, output_file):
     """
@@ -65,26 +66,28 @@ def process_csv(input_file, output_file):
                         result_entry = {
                             'Backends': name,
                             'URL': base_url,
-                            'Testing Time': testing_time,
+                            'Timestamp': testing_time,
                             'Response Time (ms)': None,
                             'HTTP Code': 'Invalid URL',
                             'Reason': 'Invalid URL format',
                             'Valid': False, 
+                            'Body Size (bytes)': 0,
                         }
                         results.append(result_entry)
                         continue
                     
                     print(f"Checking {name}: {base_url}")
-                    response_time, status, reason, valid = check_url(base_url)
+                    response_time, status, reason, valid, body_size = check_url(base_url)
                     
                     result_entry = {
                         'Backends': name,
                         'URL': base_url,
-                        'Testing Time': testing_time,
+                        'Timestamp': testing_time,
                         'Response Time (ms)': response_time,
                         'HTTP Code': status,
                         'Reason': reason,
                         'Valid': valid,
+                        'Body Size (bytes)': body_size,
                     }
                     results.append(result_entry)
                         
@@ -92,7 +95,7 @@ def process_csv(input_file, output_file):
                 print("\nProcess interrupted by user. Writing results collected so far...")
         
         # Define fieldnames for CSV
-        fieldnames = ['Backends', 'URL', 'Testing Time', 'Response Time (ms)', 'HTTP Code', 'Reason', 'Valid']
+        fieldnames = ['Backends', 'URL', 'Timestamp', 'Response Time (ms)', 'HTTP Code', 'Reason', 'Valid', 'Body Size (bytes)']
         
         # Write results to output file - either create new file or append to existing
         mode = 'a' if file_exists else 'w'
