@@ -8,6 +8,14 @@ import sys
 import os
 import datetime
 from urllib.parse import urlparse, urljoin
+import json
+
+def parse_json_content(content):
+    try:
+        json_content = json.loads(content)
+        return True, json_content
+    except json.JSONDecodeError:
+        return False, None
 
 def check_url(url):
     """
@@ -20,10 +28,24 @@ def check_url(url):
         response = requests.get(url, timeout=30)
         end_time = time.time()
         response_time = round((end_time - start_time) * 1000, 2)  # Convert to ms and round to 2 decimal places
-        if response.status_code == 200:
-            valid = True
+        # Try to parse response content as JSON
+        is_json, json_content = parse_json_content(response.content)
+        # Default reason is from response reason
+        reason = response.reason
+        # Check if response status code is between 100 and 399
+        if response.status_code >= 100 and response.status_code <= 399:
+            # If JSON is valid, mark as valid
+            if is_json:
+                valid = True
+        else:
+            valid = False
+            # If JSON is valid, get message from JSON
+            if is_json:
+                # Check if there is a message in the JSON content
+                if 'message' in json_content:
+                    reason = json_content['message']
         body_size = len(response.content)
-        return response_time, response.status_code, response.reason, valid, body_size
+        return response_time, response.status_code, reason, valid, body_size
     except requests.exceptions.Timeout:
         return None, "Timeout", "Request timed out", False, 0
     except requests.exceptions.RequestException as e:
@@ -126,11 +148,21 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Check URLs from a CSV file and output response times and status')
     parser.add_argument('-i', '--input', required=True, help='Input CSV file with Backends and URL columns')
-    parser.add_argument('-o', '--output', required=True, help='Output CSV file to write results')
-    
+    parser.add_argument('-o', '--output', required=True, help='Output directory to write results')
+
     args = parser.parse_args()
+
+    # Check if output directory exists, create it if it doesn't
+    output_dir = args.output
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Get date in YYYY-MM-DD format
+    date = datetime.datetime.now().strftime("%Y-%m-%d")
+    # Create output file path
+    output_csv = os.path.join(output_dir, f"{date}_OpenEO-Checker.csv")
     
-    process_csv(args.input, args.output)
+    process_csv(args.input, output_csv)
 
 if __name__ == "__main__":
     main()
