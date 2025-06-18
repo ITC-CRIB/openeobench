@@ -14,16 +14,19 @@ def check_url(url):
     Send a request to the URL and measure response time.
     Returns a tuple of (response_time, status, reason)
     """
+    valid = False
     try:
         start_time = time.time()
         response = requests.get(url, timeout=30)
         end_time = time.time()
         response_time = round((end_time - start_time) * 1000, 2)  # Convert to ms and round to 2 decimal places
-        return response_time, response.status_code, response.reason
+        if response.status_code == 200:
+            valid = True
+        return response_time, response.status_code, response.reason, valid
     except requests.exceptions.Timeout:
-        return None, "Timeout", "Request timed out"
+        return None, "Timeout", "Request timed out", False
     except requests.exceptions.RequestException as e:
-        return None, "Request exception", str(e)
+        return None, "Request exception", str(e), False
 
 def process_csv(input_file, output_file):
     """
@@ -32,12 +35,6 @@ def process_csv(input_file, output_file):
     Records HTTP response reasoning alongside the status code.
     Maintains a history of all test runs by appending new results to the output file.
     """
-    # Define list of endpoints to test for each base URL
-    endpoints = [
-        "/",                 # Root path
-        "/collections",      # OpenEO collections endpoint
-        "/processes",        # OpenEO processes endpoint
-    ]
     
     results = []
     # testing_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -67,40 +64,33 @@ def process_csv(input_file, output_file):
                     if not parsed_url.scheme or not parsed_url.netloc:
                         result_entry = {
                             'Backends': name,
-                            'Base URL': base_url,
-                            'Endpoint': '',
-                            'Full URL': base_url,
+                            'URL': base_url,
                             'Response Time (ms)': None,
-                            'Status': 'Invalid URL',
+                            'HTTP Code': 'Invalid URL',
                             'Reason': 'Invalid URL format',
-                            'Testing Time': testing_time
+                            'Valid': False, 
                         }
                         results.append(result_entry)
                         continue
                     
-                    # Test each endpoint for this base URL
-                    for endpoint in endpoints:
-                        full_url = urljoin(base_url, endpoint)
-                        print(f"Checking {name}: {full_url}")
-                        response_time, status, reason = check_url(full_url)
-                        
-                        result_entry = {
-                            'Backends': name,
-                            'Base URL': base_url,
-                            'Endpoint': endpoint,
-                            'Full URL': full_url,
-                            'Response Time (ms)': response_time,
-                            'Status': status,
-                            'Reason': reason,
-                            'Testing Time': testing_time
-                        }
-                        results.append(result_entry)
+                    print(f"Checking {name}: {base_url}")
+                    response_time, status, reason, valid = check_url(base_url)
+                    
+                    result_entry = {
+                        'Backends': name,
+                        'URL': base_url,
+                        'Response Time (ms)': response_time,
+                        'HTTP Code': status,
+                        'Reason': reason,
+                        'Valid': valid,
+                    }
+                    results.append(result_entry)
                         
             except KeyboardInterrupt:
                 print("\nProcess interrupted by user. Writing results collected so far...")
         
         # Define fieldnames for CSV
-        fieldnames = ['Backends', 'Base URL', 'Endpoint', 'Full URL', 'Response Time (ms)', 'Status', 'Reason', 'Testing Time']
+        fieldnames = ['Backends', 'URL', 'Response Time (ms)', 'HTTP Code', 'Reason', 'Valid']
         
         # Write results to output file - either create new file or append to existing
         mode = 'a' if file_exists else 'w'
