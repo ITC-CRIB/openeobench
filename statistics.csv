@@ -1,0 +1,17 @@
+Backend,URL,Success Ratio (%),Average Response Time (ms),Response Time StdDev (ms),Normalized Response Time (ms/byte),Normalized Time StdDev (ms/byte)
+copernicus-dataspace,https://openeo.dataspace.copernicus.eu/.well-known/openeo,100.00,229.60,44.17,0.722016,0.138901
+copernicus-dataspace,https://openeo.dataspace.copernicus.eu/openeo,100.00,252.07,108.80,0.075268,0.032486
+copernicus-dataspace,https://openeo.dataspace.copernicus.eu/openeo/collections,100.00,190.24,58.99,0.004837,0.001500
+copernicus-dataspace,https://openeo.dataspace.copernicus.eu/openeo/processes,100.00,1231.16,282.80,0.001053,0.000242
+eodc,https://openeo.eodc.eu/.well-known/openeo,100.00,241.06,41.28,1.282220,0.219557
+eodc,https://openeo.eodc.eu/openeo/1.2.0,100.00,200.48,12.39,0.060167,0.003719
+eodc,https://openeo.eodc.eu/openeo/1.2.0/collections,100.00,561.60,69.50,0.003574,0.000442
+eodc,https://openeo.eodc.eu/openeo/1.2.0/processes,100.00,425.52,37.70,0.001235,0.000109
+openeo-platform,https://openeocloud.vito.be/.well-known/openeo,100.00,102.68,12.79,0.360264,0.044884
+openeo-platform,https://openeocloud.vito.be/openeo/1.2,100.00,421.77,253.29,0.111284,0.066832
+openeo-platform,https://openeocloud.vito.be/openeo/1.2/collections,100.00,205.68,52.19,0.000660,0.000167
+openeo-platform,https://openeocloud.vito.be/openeo/1.2/processes,100.00,243.15,44.94,0.000714,0.000132
+vito,https://openeo.vito.be/.well-known/openeo,100.00,100.85,11.07,0.373511,0.041011
+vito,https://openeo.vito.be/openeo,100.00,153.05,17.51,0.043891,0.005023
+vito,https://openeo.vito.be/openeo/collections,100.00,206.71,147.01,0.001118,0.000799
+vito,https://openeo.vito.be/openeo/processes,100.00,376.97,146.36,0.000320,0.000124
