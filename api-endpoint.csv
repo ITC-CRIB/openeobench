@@ -1,8 +1,8 @@
 Backends,URL
-copernicus-dataspace, https://openeo.dataspace.copernicus.eu/.well-known/openeo
-eodc, https://openeo.eodc.eu/.well-known/openeo
-openeo-platform, https://openeocloud.vito.be/.well-known/openeo
-vito, https://openeo.vito.be/.well-known/openeo
+copernicus-dataspace,https://openeo.dataspace.copernicus.eu/.well-known/openeo
+eodc,https://openeo.eodc.eu/.well-known/openeo
+openeo-platform,https://openeocloud.vito.be/.well-known/openeo
+vito,https://openeo.vito.be/.well-known/openeo
 EO4EU,https://umm-api.apps.eo4eu.eu/EO/.well-known/openeo
 eurac,https://openeo.eurac.edu/.well-known/openeo
 earth-engine,https://earthengine.openeo.org/.well-known/openeo
