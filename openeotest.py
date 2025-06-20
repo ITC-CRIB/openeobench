@@ -97,32 +97,6 @@ def authenticate(connection, backend_name):
         logger.error(f"Authentication failed for backend {backend_name}: {str(e)}")
         return False
 
-def execute_batch_job(connection, process_graph, pg_name, backend_name, scenario_output_dir):
-    """Execute a batch job with the given process graph."""
-    try:
-        # Create a batch job
-        job = connection.create_job(process_graph)
-        job_id = job.job_id
-        
-        logger.info(f"Created batch job {job_id} for process graph {pg_name} on backend {backend_name}")
-        
-        # Start the job
-        
-        logger.info(f"Started batch job {job_id}")
-        job.start_and_wait()
-
-        logger.info(f"Downloaded results for job {job_id}")
-        job.get_results().download_files(scenario_output_dir)
-        
-        # Wait for job completion (with timeout)
-        status = job.status()
-        logger.info(f"Job {job_id} status: {status}")
-        
-        return job_id, status
-    except Exception as e:
-        logger.error(f"Failed to execute batch job for process graph {pg_name} on backend {backend_name}: {str(e)}")
-        return None, "failed"
-
 def run_task(api_url, scenario_path, output_directory=None):
     """Run a specific scenario on a given backend."""
     # Parse hostname for default output directory
@@ -168,6 +142,7 @@ def run_task(api_url, scenario_path, output_directory=None):
         logger.error(f"Authentication failed for backend: {str(e)}")
         return
     
+    running_logs = {}
     # Execute batch job
     try:
         # Create a batch job
@@ -175,10 +150,14 @@ def run_task(api_url, scenario_path, output_directory=None):
         job_id = job.job_id
         
         logger.info(f"Created batch job {job_id} for process graph {scenario_name}")
-        
+        running_logs['job_creation'] = datetime.datetime.now().timestamp()
+
         # Start the job and wait for completion
         logger.info(f"Started batch job {job_id}")
+        running_logs['job_start'] = datetime.datetime.now().timestamp()
+        
         job.start_and_wait()
+        running_logs['job_completion'] = datetime.datetime.now().timestamp()
 
         # Download results
         logger.info(f"Downloading results for job {job_id}")
@@ -187,6 +166,7 @@ def run_task(api_url, scenario_path, output_directory=None):
         # Get final status
         status = job.status()
         logger.info(f"Job {job_id} status: {status}")
+        running_logs['job_status'] = status
         
         # Save job details
         result = {
@@ -200,10 +180,19 @@ def run_task(api_url, scenario_path, output_directory=None):
         with open(os.path.join(output_directory, 'job_result.json'), 'w') as f:
             json.dump(result, f, indent=2)
         
+        # Save logs
+        with open(os.path.join(output_directory, 'job_logs.json'), 'w') as f:
+            json.dump(running_logs, f, indent=2)
+        
         logger.info(f"Run completed. Results saved to {output_directory}")
         
     except Exception as e:
         logger.error(f"Failed to execute batch job for process graph {scenario_name}: {str(e)}")
+        running_logs['job_completion'] = datetime.datetime.now().timestamp()
+        running_logs['job_status'] = "failed"
+        
+        with open(os.path.join(output_directory, 'job_logs.json'), 'w') as f:
+            json.dump(running_logs, f, indent=2)
 
 
 def summarize_task(input_folders, output_format):
