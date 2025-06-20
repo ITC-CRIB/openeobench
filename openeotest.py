@@ -146,11 +146,11 @@ def run_task(api_url, scenario_path, output_directory=None):
     # Execute batch job
     try:
         # Create a batch job
+        running_logs['job_creation'] = datetime.datetime.now().timestamp()
         job = connection.create_job(process_graph)
         job_id = job.job_id
-        
         logger.info(f"Created batch job {job_id} for process graph {scenario_name}")
-        running_logs['job_creation'] = datetime.datetime.now().timestamp()
+        
 
         # Start the job and wait for completion
         logger.info(f"Started batch job {job_id}")
@@ -162,6 +162,7 @@ def run_task(api_url, scenario_path, output_directory=None):
         # Download results
         logger.info(f"Downloading results for job {job_id}")
         job.get_results().download_files(output_directory)
+        running_logs['job_download'] = datetime.datetime.now().timestamp()
         
         # Get final status
         status = job.status()
