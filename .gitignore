@@ -2,3 +2,4 @@ output.csv
 .venv
 scenario_results.json
 scenario_runner.log
+output

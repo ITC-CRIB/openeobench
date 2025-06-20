@@ -13,6 +13,7 @@ import glob
 from pathlib import Path
 import openeo
 import sys
+import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -91,7 +92,7 @@ def authenticate(connection, backend_name):
         logger.error(f"Authentication failed for backend {backend_name}: {str(e)}")
         return False
 
-def execute_batch_job(connection, process_graph, pg_name, backend_name):
+def execute_batch_job(connection, process_graph, pg_name, backend_name, scenario_output_dir):
     """Execute a batch job with the given process graph."""
     try:
         # Create a batch job
@@ -101,8 +102,12 @@ def execute_batch_job(connection, process_graph, pg_name, backend_name):
         logger.info(f"Created batch job {job_id} for process graph {pg_name} on backend {backend_name}")
         
         # Start the job
-        job.start_job()
+        
         logger.info(f"Started batch job {job_id}")
+        job.start_and_wait()
+
+        logger.info(f"Downloaded results for job {job_id}")
+        job.get_results().download_files(scenario_output_dir)
         
         # Wait for job completion (with timeout)
         status = job.status()
@@ -129,9 +134,14 @@ def main():
     
     # Track results
     results = []
+
+    date_time = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     
     # Process each backend
     for backend in backends:
+        scenario_output_dir = os.path.join("output", date_time, backend['name'])
+        os.makedirs(scenario_output_dir, exist_ok=True)
+
         logger.info(f"Processing backend: {backend['name']}")
         
         # Connect to backend
@@ -146,7 +156,7 @@ def main():
         # Execute batch jobs for each process graph
         for pg_name, process_graph in process_graphs.items():
             logger.info(f"Executing process graph {pg_name} on backend {backend['name']}")
-            job_id, status = execute_batch_job(connection, process_graph, pg_name, backend['name'])
+            job_id, status = execute_batch_job(connection, process_graph, pg_name, backend['name'], scenario_output_dir)
             
             results.append({
                 'backend': backend['name'],
@@ -156,7 +166,7 @@ def main():
             })
     
     # Save results to file
-    with open('scenario_results.json', 'w') as f:
+    with open(os.path.join(scenario_output_dir, 'scenario_results.json'), 'w') as f:
         json.dump(results, f, indent=2)
     
     logger.info(f"Scenario run completed. Results saved to scenario_results.json")
