@@ -209,101 +209,14 @@ def run_task(api_url, scenario_path, output_directory=None):
 def summarize_task(input_folders, output_format):
     """Generate a summary report from output folders."""
     logger.info(f"Summarizing results from {len(input_folders)} folders in {output_format} format")
-    
-    # Collect results from all input folders
-    all_results = []
-    
-    for folder in input_folders:
-        result_file = os.path.join(folder, 'job_result.json')
-        if os.path.exists(result_file):
-            try:
-                with open(result_file, 'r') as f:
-                    result = json.load(f)
-                
-                # Add folder path to the result
-                result['output_folder'] = folder
-                
-                # Check if there are actual output files
-                output_files = [f for f in os.listdir(folder) if f != 'job_result.json']
-                result['output_files'] = output_files
-                result['output_file_count'] = len(output_files)
-                
-                all_results.append(result)
-                logger.info(f"Added results from {folder}")
-            except Exception as e:
-                logger.error(f"Failed to load results from {folder}: {str(e)}")
-        else:
-            logger.warning(f"No result file found in {folder}")
-    
-    if not all_results:
-        logger.error("No results found in any of the input folders")
-        return
-    
-    # Generate output based on format
-    if output_format.lower() == 'md':
-        generate_markdown_summary(all_results)
-    elif output_format.lower() == 'csv':
-        generate_csv_summary(all_results)
-    else:
-        logger.error(f"Unsupported output format: {output_format}. Use 'md' or 'csv'.")
-
 
 def generate_markdown_summary(results):
     """Generate a markdown summary report."""
-    output_file = f"summary_{datetime.datetime.now().strftime('%Y%m%d%H%M')}.md"
-    
-    with open(output_file, 'w') as f:
-        f.write("# OpenEO Test Summary Report\n\n")
-        f.write(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}\n\n")
-        
-        f.write("## Overview\n\n")
-        f.write(f"Total tests: {len(results)}\n\n")
-        
-        # Count successful and failed jobs
-        successful = sum(1 for r in results if r.get('status') == 'finished')
-        failed = len(results) - successful
-        
-        f.write(f"- Successful: {successful}\n")
-        f.write(f"- Failed: {failed}\n\n")
-        
-        f.write("## Detailed Results\n\n")
-        f.write("| Backend | Process Graph | Status | Output Files | Job ID |\n")
-        f.write("|---------|---------------|--------|--------------|--------|\n")
-        
-        for result in results:
-            backend = result.get('backend_url', 'N/A')
-            pg_name = result.get('process_graph', 'N/A')
-            status = result.get('status', 'N/A')
-            file_count = result.get('output_file_count', 0)
-            job_id = result.get('job_id', 'N/A')
-            
-            f.write(f"| {backend} | {pg_name} | {status} | {file_count} | {job_id} |\n")
-    
-    logger.info(f"Markdown summary generated: {output_file}")
-
+    logger.info("Generating markdown summary report")
 
 def generate_csv_summary(results):
     """Generate a CSV summary report."""
-    output_file = f"summary_{datetime.datetime.now().strftime('%Y%m%d%H%M')}.csv"
-    
-    with open(output_file, 'w', newline='') as f:
-        writer = csv.writer(f)
-        
-        # Write header
-        writer.writerow(['Backend', 'Process Graph', 'Status', 'Output Files', 'Job ID', 'Output Folder'])
-        
-        # Write data rows
-        for result in results:
-            writer.writerow([
-                result.get('backend_url', 'N/A'),
-                result.get('process_graph', 'N/A'),
-                result.get('status', 'N/A'),
-                result.get('output_file_count', 0),
-                result.get('job_id', 'N/A'),
-                result.get('output_folder', 'N/A')
-            ])
-    
-    logger.info(f"CSV summary generated: {output_file}")
+    logger.info("Generating CSV summary report")
 
 
 def main():
