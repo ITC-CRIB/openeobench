@@ -70,6 +70,14 @@ def load_process_graphs(process_graph_dir):
 def connect_to_backend(backend):
     """Connect to an openEO backend."""
     try:
+        # Special handling for Earth Engine backend
+        if backend['url'] == "https://earthengine.openeo.org/v1.0":
+            connection = openeo.connect("https://earthengine.openeo.org/v1.0")
+            connection.authenticate_basic(username='group3', password='test123')
+            logger.info(f"Connected to Earth Engine backend with authentication: {backend['name']}")
+            return connection
+        
+        # Standard connection for other backends
         connection = openeo.connect(backend['url'])
         logger.info(f"Connected to backend: {backend['name']} at {backend['url']}")
         return connection
@@ -168,21 +176,29 @@ def run_task(api_url, scenario_path, output_directory=None):
     
     # Connect to backend
     try:
-        connection = openeo.connect(api_url)
-        logger.info(f"Connected to backend at {api_url}")
+        # Special handling for Earth Engine backend
+        if api_url == "https://earthengine.openeo.org/v1.0":
+            connection = openeo.connect(api_url)
+            connection.authenticate_basic(username='group3', password='test123')
+            logger.info("Connected to Earth Engine backend with authentication")
+        else:
+            # Standard connection for other backends
+            connection = openeo.connect(api_url)
+            logger.info(f"Connected to backend at {api_url}")
+            
+            # Authenticate
+            try:
+                connection.authenticate_oidc()
+                logger.info("Authenticated with backend")
+            except Exception as e:
+                logger.error(f"Authentication failed for backend: {str(e)}")
+                results["error"] = f"Authentication failed: {str(e)}"
+                _save_results(results, output_directory, scenario_name, timestamp)
+                return results
+                
     except Exception as e:
         logger.error(f"Failed to connect to backend at {api_url}: {str(e)}")
         results["error"] = f"Failed to connect to backend: {str(e)}"
-        _save_results(results, output_directory, scenario_name, timestamp)
-        return results
-    
-    # Authenticate
-    try:
-        connection.authenticate_oidc()
-        logger.info("Authenticated with backend")
-    except Exception as e:
-        logger.error(f"Authentication failed for backend: {str(e)}")
-        results["error"] = f"Authentication failed: {str(e)}"
         _save_results(results, output_directory, scenario_name, timestamp)
         return results
     
@@ -280,40 +296,73 @@ def run_task(api_url, scenario_path, output_directory=None):
             download_start = time.time()
             logger.info(f"Downloading results for job {job_id}")
             
+            # Set up a timestamped downloads directory for TIFF files
+            download_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            clean_scenario_name = scenario_name.replace('.json', '').replace('/', '_').replace('\\', '_')
+            downloads_dir = os.path.join(output_directory, f"files_{clean_scenario_name}_{download_timestamp}")
+            os.makedirs(downloads_dir, exist_ok=True)
+            
+            # Get the results
             job_results = job.get_results()
-            job_results.download_files(output_directory)
             
-            results["download_time"] = time.time() - download_start
-            results["status"] = "success"
+            # First download to a temporary directory
+            temp_dir = os.path.join(output_directory, "temp_download")
+            os.makedirs(temp_dir, exist_ok=True)
+            job_results.download_files(temp_dir)
             
-            # Track downloaded files and sizes
+            # Process and rename files with timestamps
             downloaded_files = []
             total_size = 0
             
-            for root, _, files in os.walk(output_directory):
-                # Skip the process_graphs directory when counting result files
-                if "process_graphs" in root:
-                    continue
-                    
+            for root, _, files in os.walk(temp_dir):
                 for file in files:
-                    if file.endswith(('.json', '.log')):  # Skip metadata files
+                    # Skip metadata files
+                    if file.endswith(('.json', '.log')):
                         continue
+                    
+                    # Generate a name with timestamp for TIFF files
+                    src_path = os.path.join(root, file)
+                    file_base, file_ext = os.path.splitext(file)
+                    
+                    if file_ext.lower() in ['.tif', '.tiff']:
+                        # Add scenario name and timestamp to TIFF files
+                        new_name = f"{file_base}_{clean_scenario_name}_{download_timestamp}{file_ext}"
+                    else:
+                        # Keep original name for non-TIFF files
+                        new_name = file
                         
-                    file_path = os.path.join(root, file)
-                    file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+                    dst_path = os.path.join(downloads_dir, new_name)
+                    
+                    # Copy the file with the new name
+                    shutil.copy2(src_path, dst_path)
+                    
+                    # Track file stats
+                    file_size = os.path.getsize(dst_path) / (1024 * 1024)  # MB
                     total_size += file_size
-                    rel_path = os.path.relpath(file_path, output_directory)
+                    rel_path = os.path.relpath(dst_path, output_directory)
                     downloaded_files.append({
                         "path": rel_path,
-                        "size_mb": round(file_size, 2)
+                        "size_mb": round(file_size, 2),
+                        "timestamp": download_timestamp
                     })
                     logger.info(f"Downloaded: {rel_path} ({file_size:.2f} MB)")
+            
+            # Clean up temporary directory
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            
+            results["download_time"] = time.time() - download_start
+            results["status"] = "success"
+            results["download_timestamp"] = download_timestamp
             
             results["files"] = downloaded_files
             results["file_count"] = len(downloaded_files)
             results["total_size_mb"] = round(total_size, 2)
+            results["downloads_directory"] = os.path.relpath(downloads_dir, output_directory)
+            results["scenario_name_clean"] = clean_scenario_name
             
             logger.info(f"Download completed: {len(downloaded_files)} files, {total_size:.2f} MB total")
+            logger.info(f"Files saved with scenario name '{clean_scenario_name}' and timestamp {download_timestamp}")
+            logger.info(f"Files location: {downloads_dir}")
             
         else:
             # Job failed or was canceled
