@@ -3,22 +3,6 @@
     "loadcollection1": {
       "arguments": {
         "id": "COPERNICUS/S2_HARMONIZED",
-        "properties": {
-          "eo:cloud_cover": {
-            "process_graph": {
-              "lte1": {
-                "arguments": {
-                  "x": {
-                    "from_parameter": "value"
-                  },
-                  "y": 50
-                },
-                "process_id": "lte",
-                "result": true
-              }
-            }
-          }
-        },
         "spatial_extent": {
           "east": 17.16130266236287,
           "north": 48.193645045045045,
