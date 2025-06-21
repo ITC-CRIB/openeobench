@@ -155,9 +155,6 @@ def run_task(api_url, scenario_path, output_directory=None):
         "process_graph_file": os.path.relpath(process_graph_file, output_directory),
         "error": None,
         "job_status_history": {},
-        "files": [],
-        "file_count": 0,
-        "total_size_mb": 0,
         "timestamp": datetime.datetime.now().isoformat()
     }
     
@@ -299,68 +296,33 @@ def run_task(api_url, scenario_path, output_directory=None):
             # Set up a timestamped downloads directory for TIFF files
             download_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             clean_scenario_name = scenario_name.replace('.json', '').replace('/', '_').replace('\\', '_')
-            #downloads_dir = os.path.join(output_directory, f"files_{clean_scenario_name}_{download_timestamp}")
-            #os.makedirs(downloads_dir, exist_ok=True)
+
             
             # Get the results
             job_results = job.get_results()
             
-            # First download to a temporary directory
-            temp_dir = os.path.join(output_directory, "temp_download")
-            os.makedirs(temp_dir, exist_ok=True)
-            job_results.download_files(temp_dir)
+            # Get and save metadata
+            metadata = job_results.get_metadata()
+            '''
+            metadata_file = os.path.join(output_directory, "metadata.json")
+            try:
+                with open(metadata_file, 'w', encoding='utf-8') as f:
+                    json.dump(metadata, f, indent=2)
+                logger.info(f"Saved job metadata to {metadata_file}")
+            except Exception as e:
+                logger.warning(f"Failed to save job metadata: {e}")
+            '''
+            # Download directly to the output directory
+            job_results.download_files(output_directory)            
             
-            # Process and rename files with timestamps
-            downloaded_files = []
-            total_size = 0
-            
-            for root, _, files in os.walk(temp_dir):
-                for file in files:
-                    # Skip metadata files
-                    if file.endswith(('.json', '.log')):
-                        continue
-                    
-                    # Generate a name with timestamp for TIFF files
-                    src_path = os.path.join(root, file)
-                    file_base, file_ext = os.path.splitext(file)
-                    
-                    if file_ext.lower() in ['.tif', '.tiff']:
-                        # Add scenario name and timestamp to TIFF files
-                        new_name = f"{file_base}_{clean_scenario_name}_{download_timestamp}{file_ext}"
-                    else:
-                        # Keep original name for non-TIFF files
-                        new_name = file
-                        
-                    dst_path = os.path.join(output_directory, new_name)
-                    
-                    # Copy the file with the new name
-                    shutil.copy2(src_path, dst_path)
-                    
-                    # Track file stats
-                    file_size = os.path.getsize(dst_path) / (1024 * 1024)  # MB
-                    total_size += file_size
-                    rel_path = os.path.relpath(dst_path, output_directory)
-                    downloaded_files.append({
-                        "path": rel_path,
-                        "size_mb": round(file_size, 2),
-                        "timestamp": download_timestamp
-                    })
-                    logger.info(f"Downloaded: {rel_path} ({file_size:.2f} MB)")
-            
-            # Clean up temporary directory
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            logger.info(f"Downloaded files to {output_directory}")
             
             results["download_time"] = time.time() - download_start
             results["status"] = "success"
             results["download_timestamp"] = download_timestamp
-            
-            results["files"] = downloaded_files
-            results["file_count"] = len(downloaded_files)
-            results["total_size_mb"] = round(total_size, 2)
             results["downloads_directory"] = output_directory
-            results["scenario_name_clean"] = clean_scenario_name
             
-            logger.info(f"Download completed: {len(downloaded_files)} files, {total_size:.2f} MB total")
+            logger.info("Download completed")
             logger.info(f"Files saved with scenario name '{clean_scenario_name}' and timestamp {download_timestamp}")
             logger.info(f"Files location: {output_directory}")
             
@@ -394,9 +356,6 @@ def run_task(api_url, scenario_path, output_directory=None):
         logger.info(f"Run completed for {scenario_name} on {backend_name}")
         logger.info(f"Status: {results['status']}")
         logger.info(f"Total time: {results['total_time']:.2f} seconds")
-        if results["status"] == "success":
-            logger.info(f"Files downloaded: {results['file_count']}")
-            logger.info(f"Total size: {results['total_size_mb']:.2f} MB")
         
         return results
 
@@ -405,7 +364,7 @@ def _save_results(results, output_directory, scenario_name, timestamp):
     """Helper function to save results to files."""
     try:
         # Save comprehensive results
-        results_file = os.path.join(output_directory, f"{scenario_name}_{timestamp}_results.json")
+        results_file = os.path.join(output_directory, "results.json")
         with open(results_file, 'w') as f:
             json.dump(results, f, indent=2)
         '''
