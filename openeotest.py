@@ -128,11 +128,11 @@ def run_task(api_url, scenario_path, output_directory=None):
     
     # Create output directory structure
     os.makedirs(output_directory, exist_ok=True)
-    process_graphs_dir = os.path.join(output_directory, "process_graphs")
-    os.makedirs(process_graphs_dir, exist_ok=True)
+    #process_graphs_dir = os.path.join(output_directory, "process_graphs")
+    #os.makedirs(process_graphs_dir, exist_ok=True)
 
     # Copy scenario file to process graphs directory
-    process_graph_file = os.path.join(process_graphs_dir, f"{scenario_name}_original.json")
+    process_graph_file = os.path.join(output_directory, "processgraph.json")
     shutil.copyfile(scenario_path, process_graph_file)
     
     # Initialize comprehensive results structure
@@ -299,8 +299,8 @@ def run_task(api_url, scenario_path, output_directory=None):
             # Set up a timestamped downloads directory for TIFF files
             download_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             clean_scenario_name = scenario_name.replace('.json', '').replace('/', '_').replace('\\', '_')
-            downloads_dir = os.path.join(output_directory, f"files_{clean_scenario_name}_{download_timestamp}")
-            os.makedirs(downloads_dir, exist_ok=True)
+            #downloads_dir = os.path.join(output_directory, f"files_{clean_scenario_name}_{download_timestamp}")
+            #os.makedirs(downloads_dir, exist_ok=True)
             
             # Get the results
             job_results = job.get_results()
@@ -331,7 +331,7 @@ def run_task(api_url, scenario_path, output_directory=None):
                         # Keep original name for non-TIFF files
                         new_name = file
                         
-                    dst_path = os.path.join(downloads_dir, new_name)
+                    dst_path = os.path.join(output_directory, new_name)
                     
                     # Copy the file with the new name
                     shutil.copy2(src_path, dst_path)
@@ -357,12 +357,12 @@ def run_task(api_url, scenario_path, output_directory=None):
             results["files"] = downloaded_files
             results["file_count"] = len(downloaded_files)
             results["total_size_mb"] = round(total_size, 2)
-            results["downloads_directory"] = os.path.relpath(downloads_dir, output_directory)
+            results["downloads_directory"] = output_directory
             results["scenario_name_clean"] = clean_scenario_name
             
             logger.info(f"Download completed: {len(downloaded_files)} files, {total_size:.2f} MB total")
             logger.info(f"Files saved with scenario name '{clean_scenario_name}' and timestamp {download_timestamp}")
-            logger.info(f"Files location: {downloads_dir}")
+            logger.info(f"Files location: {output_directory}")
             
         else:
             # Job failed or was canceled
@@ -408,7 +408,7 @@ def _save_results(results, output_directory, scenario_name, timestamp):
         results_file = os.path.join(output_directory, f"{scenario_name}_{timestamp}_results.json")
         with open(results_file, 'w') as f:
             json.dump(results, f, indent=2)
-        
+        '''
         # Also save in legacy format for compatibility
         legacy_result = {
             'backend_url': results['backend_url'],
@@ -431,7 +431,7 @@ def _save_results(results, output_directory, scenario_name, timestamp):
         
         with open(os.path.join(output_directory, 'job_logs.json'), 'w') as f:
             json.dump(legacy_logs, f, indent=2)
-            
+        '''    
     except Exception as e:
         logger.warning(f"Failed to save results: {e}")
 
