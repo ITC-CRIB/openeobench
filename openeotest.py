@@ -80,20 +80,27 @@ def connect_to_backend(backend):
 def authenticate(connection, backend_name):
     """Authenticate with the backend."""
     try:
+        # Check for Earth Engine backend
+        if connection.get_url() == "https://earthengine.openeo.org/v1.0":
+            # Use basic auth for Earth Engine with hardcoded credentials
+            connection.authenticate_basic("group3", "test123")
+            logger.info("Authenticated with Earth Engine backend using basic auth")
+            return True
+            
         # Try basic authentication if credentials are provided in environment variables
-        # username = os.environ.get(f"{backend_name.upper()}_USERNAME")
-        # password = os.environ.get(f"{backend_name.upper()}_PASSWORD")
+        username = os.environ.get(f"{backend_name.upper()}_USERNAME")
+        password = os.environ.get(f"{backend_name.upper()}_PASSWORD")
         
-        # if username and password:
-        #     connection.authenticate_oidc()
-        #     logger.info(f"Authenticated with backend {backend_name} using basic auth")
-        # else:
-        #     # If no credentials, try guest access
-        #     logger.info(f"No credentials found for {backend_name}, proceeding with guest access")
-
-        connection.authenticate_oidc()
-       
-        return True
+        if username and password:
+            connection.authenticate_basic(username, password)
+            logger.info(f"Authenticated with backend {backend_name} using basic auth from environment variables")
+            return True
+        else:
+            # Fall back to OIDC authentication
+            connection.authenticate_oidc()
+            logger.info(f"Authenticated with backend {backend_name} using OIDC")
+            return True
+    
     except Exception as e:
         logger.error(f"Authentication failed for backend {backend_name}: {str(e)}")
         return False
