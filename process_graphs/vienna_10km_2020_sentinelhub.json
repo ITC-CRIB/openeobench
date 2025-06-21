@@ -3,22 +3,6 @@
     "loadcollection1": {
       "arguments": {
         "id": "SENTINEL2_L2A",
-        "properties": {
-          "eo:cloud_cover": {
-            "process_graph": {
-              "lte1": {
-                "arguments": {
-                  "x": {
-                    "from_parameter": "value"
-                  },
-                  "y": 50
-                },
-                "process_id": "lte",
-                "result": true
-              }
-            }
-          }
-        },
         "spatial_extent": {
           "east": 16.42543639316641,
           "north": 48.25324504504504,
