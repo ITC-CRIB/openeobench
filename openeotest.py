@@ -19,6 +19,7 @@ import argparse
 import urllib.parse
 import shutil
 import csv
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -91,7 +92,7 @@ def authenticate(connection, backend_name):
         #     logger.info(f"No credentials found for {backend_name}, proceeding with guest access")
 
         connection.authenticate_oidc()
-        
+       
         return True
     except Exception as e:
         logger.error(f"Authentication failed for backend {backend_name}: {str(e)}")
@@ -101,19 +102,49 @@ def run_task(api_url, scenario_path, output_directory=None):
     """Run a specific scenario on a given backend."""
     # Parse hostname for default output directory
     hostname = urllib.parse.urlparse(api_url).netloc
+    backend_name = hostname.replace('.', '_')
     scenario_name = os.path.basename(scenario_path).replace('.json', '')
-    date_time = datetime.datetime.now().strftime("%Y%m%d%H%M")
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     
     # Set default output directory if not provided
     if not output_directory:
-        output_directory = f"{hostname.replace('.', '_')}_{scenario_name}_{date_time}"
+        output_directory = f"{backend_name}_{scenario_name}_{timestamp}"
         output_directory = os.path.join("output", output_directory)
     
-    # Create output directory
+    # Create output directory structure
     os.makedirs(output_directory, exist_ok=True)
+    process_graphs_dir = os.path.join(output_directory, "process_graphs")
+    os.makedirs(process_graphs_dir, exist_ok=True)
 
-    # Copy scenario file to output directory
-    shutil.copyfile(scenario_path, os.path.join(output_directory, "processgraph.json"))
+    # Copy scenario file to process graphs directory
+    process_graph_file = os.path.join(process_graphs_dir, f"{scenario_name}_original.json")
+    shutil.copyfile(scenario_path, process_graph_file)
+    
+    # Initialize comprehensive results structure
+    results = {
+        "backend_url": api_url,
+        "backend_name": backend_name,
+        "process_graph": scenario_name,
+        "status": "failed",
+        "job_id": None,
+        "job_status": None,
+        "start_time": time.time(),
+        "submit_time": None,
+        "start_job_time": None,
+        "job_execution_time": None,
+        "download_time": None,
+        "total_time": None,
+        "queue_time": None,
+        "processing_time": None,
+        "file_path": None,
+        "process_graph_file": os.path.relpath(process_graph_file, output_directory),
+        "error": None,
+        "job_status_history": {},
+        "files": [],
+        "file_count": 0,
+        "total_size_mb": 0,
+        "timestamp": datetime.datetime.now().isoformat()
+    }
     
     logger.info(f"Processing backend at {api_url} with scenario {scenario_name}")
     
@@ -124,7 +155,9 @@ def run_task(api_url, scenario_path, output_directory=None):
         logger.info(f"Loaded process graph from {scenario_path}")
     except Exception as e:
         logger.error(f"Failed to load process graph from {scenario_path}: {str(e)}")
-        return
+        results["error"] = f"Failed to load process graph: {str(e)}"
+        _save_results(results, output_directory, scenario_name, timestamp)
+        return results
     
     # Connect to backend
     try:
@@ -132,68 +165,219 @@ def run_task(api_url, scenario_path, output_directory=None):
         logger.info(f"Connected to backend at {api_url}")
     except Exception as e:
         logger.error(f"Failed to connect to backend at {api_url}: {str(e)}")
-        return
+        results["error"] = f"Failed to connect to backend: {str(e)}"
+        _save_results(results, output_directory, scenario_name, timestamp)
+        return results
     
     # Authenticate
     try:
         connection.authenticate_oidc()
-        logger.info(f"Authenticated with backend")
+        logger.info("Authenticated with backend")
     except Exception as e:
         logger.error(f"Authentication failed for backend: {str(e)}")
-        return
+        results["error"] = f"Authentication failed: {str(e)}"
+        _save_results(results, output_directory, scenario_name, timestamp)
+        return results
     
-    running_logs = {}
-    # Execute batch job
+    # Execute batch job with detailed timing and monitoring
     try:
         # Create a batch job
-        running_logs['job_creation'] = datetime.datetime.now().timestamp()
+        job_creation_start = time.time()
+        logger.info(f"Creating batch job for process graph {scenario_name}")
+        
         job = connection.create_job(process_graph)
         job_id = job.job_id
+        results["job_id"] = job_id
+        results["submit_time"] = time.time() - job_creation_start
+        
         logger.info(f"Created batch job {job_id} for process graph {scenario_name}")
         
-
-        # Start the job and wait for completion
-        logger.info(f"Started batch job {job_id}")
-        running_logs['job_start'] = datetime.datetime.now().timestamp()
+        # Start job execution with detailed monitoring
+        job_start_time = time.time()
+        results["start_job_time"] = job_start_time
+        job_start_datetime = datetime.datetime.now()
         
-        job.start_and_wait()
-        running_logs['job_completion'] = datetime.datetime.now().timestamp()
-
-        # Download results
-        logger.info(f"Downloading results for job {job_id}")
-        job.get_results().download_files(output_directory)
-        running_logs['job_download'] = datetime.datetime.now().timestamp()
+        logger.info(f"Starting job {job_id}")
+        job.start()
         
-        # Get final status
-        status = job.status()
-        logger.info(f"Job {job_id} status: {status}")
-        running_logs['job_status'] = status
+        # Monitor job status with increasing poll intervals
+        poll_interval = 5  # Start with 5 seconds
+        max_poll_interval = 30
+        timeout = 3600  # 1 hour timeout
+        last_status = "submitted"
+        status_times = {"submitted": job_start_datetime}
+        check_count = 0
         
-        # Save job details
-        result = {
-            'backend_url': api_url,
-            'process_graph': scenario_name,
-            'job_id': job_id,
-            'status': status
+        while True:
+            # Check timeout
+            if time.time() - job_start_time > timeout:
+                error_msg = f"Job timed out after {timeout} seconds"
+                results["error"] = error_msg
+                logger.error(error_msg)
+                break
+            
+            try:
+                current_time = datetime.datetime.now()
+                current_status = job.status()
+                check_count += 1
+                results["job_status"] = current_status
+                
+                # Record status changes
+                if current_status != last_status:
+                    status_times[current_status] = current_time
+                    status_change_time = (current_time - job_start_datetime).total_seconds()
+                    
+                    logger.info(f"Job {job_id} status changed to '{current_status}' after {status_change_time:.2f} seconds")
+                    last_status = current_status
+                else:
+                    # Log periodic status for long-running jobs
+                    if check_count % 12 == 0:  # Every minute
+                        elapsed_time = (current_time - job_start_datetime).total_seconds()
+                        logger.info(f"Job {job_id} still {current_status} after {elapsed_time:.2f} seconds")
+                
+                # Check if job is complete
+                if current_status in ["finished", "error", "canceled"]:
+                    break
+                
+                # Increase poll interval
+                poll_interval = min(poll_interval * 1.5, max_poll_interval)
+                time.sleep(poll_interval)
+                
+            except Exception as e:
+                logger.error(f"Error checking job status: {e}")
+                if time.time() - job_start_time > timeout:
+                    results["error"] = f"Job status checking failed: {str(e)}"
+                    break
+                time.sleep(poll_interval)
+        
+        # Record timing information
+        results["job_execution_time"] = time.time() - job_start_time
+        results["job_status_history"] = {
+            status: time_val.isoformat() for status, time_val in status_times.items()
         }
         
-        # Save result to file
-        with open(os.path.join(output_directory, 'job_result.json'), 'w') as f:
-            json.dump(result, f, indent=2)
+        # Calculate queue and processing times
+        if "queued" in status_times and "running" in status_times:
+            queue_time = (status_times["running"] - status_times["queued"]).total_seconds()
+            results["queue_time"] = queue_time
+            logger.info(f"Job was queued for {queue_time:.2f} seconds")
         
-        # Save logs
-        with open(os.path.join(output_directory, 'job_logs.json'), 'w') as f:
-            json.dump(running_logs, f, indent=2)
+        if "running" in status_times and "finished" in status_times:
+            processing_time = (status_times["finished"] - status_times["running"]).total_seconds()
+            results["processing_time"] = processing_time
+            logger.info(f"Backend processing time: {processing_time:.2f} seconds")
         
-        logger.info(f"Run completed. Results saved to {output_directory}")
+        # Handle job completion
+        if results["job_status"] == "finished":
+            # Download results
+            download_start = time.time()
+            logger.info(f"Downloading results for job {job_id}")
+            
+            job_results = job.get_results()
+            job_results.download_files(output_directory)
+            
+            results["download_time"] = time.time() - download_start
+            results["status"] = "success"
+            
+            # Track downloaded files and sizes
+            downloaded_files = []
+            total_size = 0
+            
+            for root, _, files in os.walk(output_directory):
+                # Skip the process_graphs directory when counting result files
+                if "process_graphs" in root:
+                    continue
+                    
+                for file in files:
+                    if file.endswith(('.json', '.log')):  # Skip metadata files
+                        continue
+                        
+                    file_path = os.path.join(root, file)
+                    file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+                    total_size += file_size
+                    rel_path = os.path.relpath(file_path, output_directory)
+                    downloaded_files.append({
+                        "path": rel_path,
+                        "size_mb": round(file_size, 2)
+                    })
+                    logger.info(f"Downloaded: {rel_path} ({file_size:.2f} MB)")
+            
+            results["files"] = downloaded_files
+            results["file_count"] = len(downloaded_files)
+            results["total_size_mb"] = round(total_size, 2)
+            
+            logger.info(f"Download completed: {len(downloaded_files)} files, {total_size:.2f} MB total")
+            
+        else:
+            # Job failed or was canceled
+            results["status"] = "failed"
+            results["error"] = f"Job ended with status: {results['job_status']}"
+            logger.error(f"Job {job_id} failed with status: {results['job_status']}")
+            
+            # Try to get job details for failed jobs
+            try:
+                job_info = job.describe_job()
+                results["job_details"] = job_info
+                logger.info("Retrieved job details for failed job")
+            except Exception as e:
+                logger.warning(f"Could not retrieve job details: {e}")
         
     except Exception as e:
-        logger.error(f"Failed to execute batch job for process graph {scenario_name}: {str(e)}")
-        running_logs['job_completion'] = datetime.datetime.now().timestamp()
-        running_logs['job_status'] = "failed"
+        logger.exception(f"Failed to execute batch job for process graph {scenario_name}: {str(e)}")
+        results["status"] = "failed"
+        results["error"] = str(e)
+    
+    finally:
+        # Calculate total time and save results
+        results["total_time"] = time.time() - results["start_time"]
+        results["timestamp"] = datetime.datetime.now().isoformat()
+        
+        _save_results(results, output_directory, scenario_name, timestamp)
+        
+        # Log completion summary
+        logger.info(f"Run completed for {scenario_name} on {backend_name}")
+        logger.info(f"Status: {results['status']}")
+        logger.info(f"Total time: {results['total_time']:.2f} seconds")
+        if results["status"] == "success":
+            logger.info(f"Files downloaded: {results['file_count']}")
+            logger.info(f"Total size: {results['total_size_mb']:.2f} MB")
+        
+        return results
+
+
+def _save_results(results, output_directory, scenario_name, timestamp):
+    """Helper function to save results to files."""
+    try:
+        # Save comprehensive results
+        results_file = os.path.join(output_directory, f"{scenario_name}_{timestamp}_results.json")
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        
+        # Also save in legacy format for compatibility
+        legacy_result = {
+            'backend_url': results['backend_url'],
+            'process_graph': results['process_graph'],
+            'job_id': results['job_id'],
+            'status': results.get('job_status', results['status'])
+        }
+        
+        with open(os.path.join(output_directory, 'job_result.json'), 'w') as f:
+            json.dump(legacy_result, f, indent=2)
+        
+        # Save timing logs in legacy format
+        legacy_logs = {
+            'job_creation': results['start_time'],
+            'job_start': results.get('start_job_time', results['start_time']),
+            'job_completion': results['start_time'] + results.get('job_execution_time', 0),
+            'job_download': results['start_time'] + results.get('total_time', 0) - results.get('download_time', 0),
+            'job_status': results.get('job_status', results['status'])
+        }
         
         with open(os.path.join(output_directory, 'job_logs.json'), 'w') as f:
-            json.dump(running_logs, f, indent=2)
+            json.dump(legacy_logs, f, indent=2)
+            
+    except Exception as e:
+        logger.warning(f"Failed to save results: {e}")
 
 
 def summarize_task(input_folders, output_format):
