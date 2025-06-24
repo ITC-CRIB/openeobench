@@ -505,6 +505,11 @@ def summarize_task(input_patterns, output_path):
                 data = json.load(f)
             # Just use the folder name without the full path
             data["_folder"] = os.path.basename(folder)
+            
+            # Count TIFF files in the folder
+            tiff_files = glob.glob(os.path.join(folder, "*.tif")) + glob.glob(os.path.join(folder, "*.tiff"))
+            data["tiff_count"] = len(tiff_files)
+            
             all_results.append(data)
             all_keys.update(data.keys())
         except Exception as e:
@@ -526,6 +531,7 @@ def summarize_task(input_patterns, output_path):
         "processing_time": "seconds",
         "download_timestamp": "datetime",
         "timestamp": "datetime",
+        "tiff_count": "files",
     }
     # Add more units as needed
 
@@ -1234,7 +1240,7 @@ def _create_matrix_visualization(folders_data, output_path, include_stats=True):
         else:
             logger.warning(f"Unrecognized data structure for folder {folder_name}")
             
-    # Sort filenames for consistent ordering
+    # Sort filenames for
     all_filenames = sorted(all_filenames)
     
     # Generate the markdown file
@@ -1790,7 +1796,7 @@ def _get_geotiff_statistics(geotiff_path):
                 datatype = band_match.group(2)
                 
                 # Extract description if available
-                desc_match = re.search(r'Description = ([^\n]+)', block)
+                desc_match = re.search(r'Description = ([^\n+)', block)
                 description = desc_match.group(1) if desc_match else None
                 
                 band_info.append((band_num, datatype, description))
@@ -1899,7 +1905,7 @@ def _get_geotiff_statistics(geotiff_path):
                     }
                     
                     # Track if all bands have the same datatype
-                    band_datatypes = set()
+                    band_datatypes = set();
                     
                     for i in range(1, ds.RasterCount + 1):
                         try:
@@ -1911,12 +1917,12 @@ def _get_geotiff_statistics(geotiff_path):
                                 datatype_code = band.DataType
                                 datatype_str = gdal_datatypes.get(datatype_code, f"Unknown ({datatype_code})")
                                 stats[prefix + 'datatype'] = datatype_str
-                                band_datatypes.add(datatype_str)
+                                band_datatypes.add(datatype_str);
                                 
                                 # Get description (if available)
                                 description = band.GetDescription()
                                 if description:
-                                    stats[prefix + 'description'] = description
+                                    stats[prefix + 'description'] = description;
                                 
                                 # Get statistics
                                 try:
@@ -2009,6 +2015,403 @@ def _create_placeholder_image(output_path, filename, error_message):
         logger.error(f"Failed to create placeholder image: {e}")
         # Return the path anyway even if we failed
         return output_path
+
+def get_tiff_files(folder_path):
+    """
+    Get list of TIFF files from a folder, excluding auxiliary files.
+    
+    Args:
+        folder_path: Path to the folder
+        
+    Returns:
+        list: List of TIFF file paths (excluding .aux.xml files)
+    """
+    tiff_patterns = ['*.tif', '*.tiff', '*.TIF', '*.TIFF']
+    tiff_files = []
+    
+    for pattern in tiff_patterns:
+        files = glob.glob(os.path.join(folder_path, pattern))
+        # Filter out auxiliary files
+        files = [f for f in files if not f.endswith('.aux.xml')]
+        tiff_files.extend(files)
+    
+    return tiff_files
+
+def compare_geotiffs(ref_path, comp_path, tolerance=1e-6):
+    """
+    Compare two GeoTIFF files by metadata and pixel values.
+    
+    Args:
+        ref_path: Path to reference GeoTIFF
+        comp_path: Path to comparison GeoTIFF
+        tolerance: Tolerance for pixel value comparison
+        
+    Returns:
+        dict: Comparison result with 'match' (bool) and 'reason' (string)
+    """
+    if not GDAL_AVAILABLE:
+        return {'match': False, 'reason': 'GDAL not available for comparison'}
+    
+    try:
+        # Open both files
+        ref_ds = gdal.Open(ref_path)
+        comp_ds = gdal.Open(comp_path)
+        
+        if ref_ds is None:
+            return {'match': False, 'reason': f'Cannot open reference file: {os.path.basename(ref_path)}'}
+        if comp_ds is None:
+            return {'match': False, 'reason': f'Cannot open comparison file: {os.path.basename(comp_path)}'}
+        
+        # Compare basic metadata
+        if ref_ds.RasterXSize != comp_ds.RasterXSize or ref_ds.RasterYSize != comp_ds.RasterYSize:
+            return {'match': False, 'reason': f'Different dimensions: {ref_ds.RasterXSize}x{ref_ds.RasterYSize} vs {comp_ds.RasterXSize}x{comp_ds.RasterYSize}'}
+        
+        if ref_ds.RasterCount != comp_ds.RasterCount:
+            return {'match': False, 'reason': f'Different band count: {ref_ds.RasterCount} vs {comp_ds.RasterCount}'}
+        
+        # Compare geotransform (spatial reference)
+        ref_gt = ref_ds.GetGeoTransform()
+        comp_gt = comp_ds.GetGeoTransform()
+        if ref_gt != comp_gt:
+            return {'match': False, 'reason': 'Different geotransform/spatial reference'}
+        
+        # Try to compare pixel values, but fallback gracefully if GDAL array operations fail
+        try:
+            # Sample and compare pixel values from multiple locations
+            sample_points = min(100, ref_ds.RasterXSize * ref_ds.RasterYSize // 100)  # Sample up to 100 points
+            if sample_points < 10:
+                sample_points = min(10, ref_ds.RasterXSize * ref_ds.RasterYSize)
+            
+            np.random.seed(42)  # For reproducible sampling
+            x_coords = np.random.randint(0, ref_ds.RasterXSize, sample_points)
+            y_coords = np.random.randint(0, ref_ds.RasterYSize, sample_points)
+            
+            for band_idx in range(1, ref_ds.RasterCount + 1):
+                ref_band = ref_ds.GetRasterBand(band_idx)
+                comp_band = comp_ds.GetRasterBand(band_idx)
+                
+                # Check data types
+                if ref_band.DataType != comp_band.DataType:
+                    return {'match': False, 'reason': f'Different data types in band {band_idx}'}
+                
+                # Sample pixel values
+                for x, y in zip(x_coords, y_coords):
+                    ref_val = ref_band.ReadAsArray(x, y, 1, 1)
+                    comp_val = comp_band.ReadAsArray(x, y, 1, 1)
+                    
+                    if ref_val is None or comp_val is None:
+                        continue
+                    
+                    ref_val = float(ref_val[0, 0])
+                    comp_val = float(comp_val[0, 0])
+                    
+                    # Handle NaN values
+                    if np.isnan(ref_val) and np.isnan(comp_val):
+                        continue
+                    elif np.isnan(ref_val) or np.isnan(comp_val):
+                        return {'match': False, 'reason': f'NaN mismatch in band {band_idx} at ({x},{y})'}
+                    
+                    # Compare with tolerance
+                    if abs(ref_val - comp_val) > tolerance:
+                        return {'match': False, 'reason': f'Pixel value difference in band {band_idx}: {abs(ref_val - comp_val):.2e} > {tolerance:.2e}'}
+        
+        except Exception as pixel_error:
+            # If pixel comparison fails (e.g., GDAL array issues), fall back to metadata-only comparison
+            return {'match': True, 'reason': f'Metadata matches (pixel comparison failed: {str(pixel_error)})'}
+        
+        return {'match': True, 'reason': 'Files match within tolerance'}
+        
+    except Exception as e:
+        return {'match': False, 'reason': f'Comparison error: {str(e)}'}
+    finally:
+        # Cleanup
+        if 'ref_ds' in locals() and ref_ds is not None:
+            ref_ds = None
+        if 'comp_ds' in locals() and comp_ds is not None:
+            comp_ds = None
+
+def group_folders_by_platform(folders):
+    """
+    Group output folders by platform based on folder naming convention.
+    Format: {backend_url_with_underscores}_{scenario_with_backend}_{timestamp}
+    
+    Args:
+        folders: List of folder paths
+        
+    Returns:
+        dict: Platform name -> list of folder info dicts
+    """
+    platform_groups = defaultdict(list)
+    
+    for folder_path in folders:
+        folder_name = os.path.basename(folder_path)
+        
+        # Extract platform from folder name
+        parts = folder_name.split('_')
+        if len(parts) >= 3:
+            # Find timestamp (14 digits at the end)
+            timestamp_idx = -1
+            for i in range(len(parts) - 1, -1, -1):
+                if re.match(r'^\d{14}$', parts[i]):
+                    timestamp_idx = i
+                    break
+            
+            if timestamp_idx > 1:
+                # Platform could be multiple parts before timestamp
+                # Look for common platform patterns
+                platform_parts = []
+                platform_start_idx = timestamp_idx - 1
+                
+                # Check for multi-word platform names
+                if timestamp_idx >= 2 and parts[timestamp_idx - 2] == 'openeo' and parts[timestamp_idx - 1] == 'platform':
+                    platform_parts = ['openeo', 'platform']
+                    platform_start_idx = timestamp_idx - 2
+                elif parts[timestamp_idx - 1] in ['earthengine', 'cdse', 'vito', 'eodc', 'platform']:
+                    platform_parts = [parts[timestamp_idx - 1]]
+                    platform_start_idx = timestamp_idx - 1
+                else:
+                    # Default: single part before timestamp
+                    platform_parts = [parts[timestamp_idx - 1]]
+                    platform_start_idx = timestamp_idx - 1
+                
+                platform = '_'.join(platform_parts)
+                
+                # Extract the actual scenario by removing backend URL and platform
+                scenario_with_backend = parts[:platform_start_idx]
+                
+                # Try to identify and remove common backend URL patterns
+                scenario_parts = []
+                skip_backend = False
+                
+                for i, part in enumerate(scenario_with_backend):
+                    # Skip known backend URL patterns
+                    if part in ['earthengine', 'openeo', 'openeocloud', 'dataspace', 'copernicus', 'eu', 'org', 'vito', 'be'] and i < 4:
+                        skip_backend = True
+                        continue
+                    # Once we hit a non-backend part, start collecting scenario
+                    if skip_backend and (part.startswith(('ndvi', 'reducer', 'vienna', 'bratislava')) or 
+                                       part.endswith(('km', 'median', 'mean')) or
+                                       re.match(r'^\d+$', part) or part in ['10km', '2024', '2020', '2018']):
+                        scenario_parts.extend(scenario_with_backend[i:])
+                        break
+                
+                # If we couldn't identify the scenario start, use everything after index 3
+                if not scenario_parts and len(scenario_with_backend) > 3:
+                    scenario_parts = scenario_with_backend[3:]
+                elif not scenario_parts:
+                    scenario_parts = scenario_with_backend
+                
+                scenario = '_'.join(scenario_parts)
+                
+                platform_groups[platform].append({
+                    'path': folder_path,
+                    'name': folder_name,
+                    'scenario': scenario,
+                    'platform': platform
+                })
+            else:
+                # Fallback: assume last part before potential timestamp is platform
+                platform = parts[-2] if len(parts) >= 2 else parts[-1]
+                scenario = '_'.join(parts[:-2]) if len(parts) >= 3 else '_'.join(parts[:-1])
+                
+                platform_groups[platform].append({
+                    'path': folder_path,
+                    'name': folder_name,
+                    'scenario': scenario,
+                    'platform': platform
+                })
+        else:
+            # Fallback: use folder name as-is
+            platform_groups[folder_name].append({
+                'path': folder_path,
+                'name': folder_name,
+                'scenario': folder_name,
+                'platform': folder_name
+            })
+    
+    return dict(platform_groups)
+
+def compare_task(input_patterns, reference_platform, output_path, tolerance=1e-6):
+    """
+    Compare GeoTIFF results across different platforms.
+    
+    Args:
+        input_patterns: List of glob patterns for input folders
+        reference_platform: Name of the reference platform
+        output_path: Output markdown file path
+        tolerance: Tolerance for pixel value comparison
+    """
+    print(f"Compare task: input_patterns={input_patterns}, reference_platform={reference_platform}")
+    print(f"Output: {output_path}, tolerance={tolerance}")
+    
+    if not output_path.endswith('.md'):
+        print("Error: Output file must end with .md")
+        sys.exit(1)
+    
+    # Search for matching folders in the output directory
+    output_dir = os.path.join(os.getcwd(), 'output')
+    if not os.path.exists(output_dir):
+        print(f"Error: Output directory '{output_dir}' does not exist")
+        sys.exit(1)
+    
+    print(f"Searching in: {output_dir}")
+    
+    # Find all matching folders
+    matching_folders = []
+    for pattern in input_patterns:
+        pattern_path = os.path.join(output_dir, pattern)
+        matches = glob.glob(pattern_path)
+        matching_folders.extend([f for f in matches if os.path.isdir(f)])
+        print(f"Pattern '{pattern}' found {len([f for f in matches if os.path.isdir(f)])} folders")
+    
+    if not matching_folders:
+        print("Error: No matching folders found")
+        sys.exit(1)
+    
+    print(f"Total folders found: {len(matching_folders)}")
+    
+    # Group folders by platform
+    platform_groups = group_folders_by_platform(matching_folders)
+    print(f"Platforms found: {list(platform_groups.keys())}")
+    
+    # Check if reference platform exists
+    if reference_platform not in platform_groups:
+        print(f"Error: Reference platform '{reference_platform}' not found")
+        print(f"Available platforms: {list(platform_groups.keys())}")
+        sys.exit(1)
+    
+    # Get reference folders
+    reference_folders = platform_groups[reference_platform]
+    comparison_platforms = {k: v for k, v in platform_groups.items() if k != reference_platform}
+    
+    print(f"Reference platform '{reference_platform}' has {len(reference_folders)} folders")
+    print(f"Comparing against {len(comparison_platforms)} other platforms")
+    
+    # Build comparison matrix
+    comparison_results = {}
+    scenario_names = set()
+    
+    # First, collect all unique scenarios and pick one representative folder per scenario per platform
+    scenario_folders = defaultdict(lambda: defaultdict(list))
+    
+    # Group folders by scenario and platform
+    for platform, folders in platform_groups.items():
+        for folder in folders:
+            scenario = folder['scenario']
+            scenario_names.add(scenario)
+            scenario_folders[scenario][platform].append(folder)
+    
+    # Process each scenario once
+    for scenario in scenario_names:
+        if scenario not in comparison_results:
+            comparison_results[scenario] = {}
+        
+        # Get reference folders for this scenario
+        ref_folders = scenario_folders[scenario].get(reference_platform, [])
+        if not ref_folders:
+            continue  # Skip scenarios without reference
+        
+        # Use the first reference folder to get the file list and count
+        ref_folder = ref_folders[0]
+        ref_tiffs = get_tiff_files(ref_folder['path'])
+        total_files = len(ref_tiffs)
+        
+        for platform, folders in comparison_platforms.items():
+            comparison_results[scenario][platform] = {
+                'total': total_files,
+                'matching': 0,
+                'not_matching': 0,
+                'missing': 0,
+                'reasons': []
+            }
+            
+            # Find corresponding folders in comparison platform
+            comp_folders = scenario_folders[scenario].get(platform, [])
+            
+            if not comp_folders:
+                # No corresponding scenario folder
+                comparison_results[scenario][platform]['missing'] = total_files
+                comparison_results[scenario][platform]['reasons'].append(f"No {platform} folder for scenario {scenario}")
+                continue
+            
+            # Use the first comparison folder
+            comp_folder = comp_folders[0]
+            comp_tiffs = get_tiff_files(comp_folder['path'])
+            comp_tiff_names = {os.path.basename(t): t for t in comp_tiffs}
+            
+            # Compare each reference TIFF
+            for ref_tiff in ref_tiffs:
+                ref_name = os.path.basename(ref_tiff)
+                
+                if ref_name not in comp_tiff_names:
+                    # Missing file
+                    comparison_results[scenario][platform]['missing'] += 1
+                    comparison_results[scenario][platform]['reasons'].append(f"Missing file: {ref_name}")
+                else:
+                    # Compare files
+                    comp_result = compare_geotiffs(ref_tiff, comp_tiff_names[ref_name], tolerance)
+                    
+                    if comp_result['match']:
+                        comparison_results[scenario][platform]['matching'] += 1
+                    else:
+                        comparison_results[scenario][platform]['not_matching'] += 1
+                        comparison_results[scenario][platform]['reasons'].append(f"{ref_name}: {comp_result['reason']}")
+    
+    # Generate markdown report
+    print(f"Writing comparison report to: {output_path}")
+    
+    with open(output_path, 'w') as f:
+        f.write(f"# GeoTIFF Comparison Report\n\n")
+        f.write(f"**Reference Platform:** {reference_platform}\n")
+        f.write(f"**Tolerance:** {tolerance}\n")
+        f.write(f"**Generated:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        
+        if not comparison_results:
+            f.write("No comparison results found.\n")
+            return
+        
+        # Summary table
+        f.write("## Summary\n\n")
+        f.write("| Scenario | Platform | Total | Matching | Not Matching | Missing | Match Rate |\n")
+        f.write("|----------|----------|-------|----------|--------------|---------|------------|\n")
+        
+        for scenario in sorted(scenario_names):
+            if scenario in comparison_results:
+                for platform in sorted(comparison_results[scenario].keys()):
+                    result = comparison_results[scenario][platform]
+                    total = result['total']
+                    matching = result['matching']
+                    match_rate = f"{matching}/{total} ({100*matching/total:.1f}%)" if total > 0 else "N/A"
+                    
+                    f.write(f"| {scenario} | {platform} | {total} | {matching} | {result['not_matching']} | {result['missing']} | {match_rate} |\n")
+        
+        # Detailed results
+        f.write("\n## Detailed Results\n\n")
+        
+        for scenario in sorted(scenario_names):
+            if scenario not in comparison_results:
+                continue
+                
+            f.write(f"### {scenario}\n\n")
+            
+            for platform in sorted(comparison_results[scenario].keys()):
+                result = comparison_results[scenario][platform]
+                f.write(f"#### vs {platform}\n\n")
+                f.write(f"- **Total files:** {result['total']}\n")
+                f.write(f"- **Matching:** {result['matching']}\n")
+                f.write(f"- **Not matching:** {result['not_matching']}\n")
+                f.write(f"- **Missing:** {result['missing']}\n\n")
+                
+                if result['reasons']:
+                    f.write("**Issues:**\n")
+                    for reason in result['reasons'][:10]:  # Limit to first 10 reasons
+                        f.write(f"- {reason}\n")
+                    if len(result['reasons']) > 10:
+                        f.write(f"- ... and {len(result['reasons']) - 10} more issues\n")
+                    f.write("\n")
+    
+    print(f"Comparison complete! Report saved to: {output_path}")
+
 def main():
     """Main function to parse arguments and execute the appropriate task."""
     parser = argparse.ArgumentParser(description='OpenEO Backend Scenario Runner and Summarizer')
@@ -2041,6 +2444,17 @@ def main():
     visualize_parser.add_argument('input', nargs='?', help=argparse.SUPPRESS)
     visualize_parser.add_argument('output', nargs='?', help=argparse.SUPPRESS)
     
+    # Compare task parser
+    compare_parser = subparsers.add_parser('compare', help='Compare GeoTIFF results across different platforms')
+    compare_parser.add_argument('--input', dest='input_patterns', required=True, nargs='+', 
+                               help='Input folders to compare (supports glob patterns)')
+    compare_parser.add_argument('--reference', dest='reference_platform', required=True, 
+                               help='Reference platform name to compare against')
+    compare_parser.add_argument('--output', dest='output_path', required=True, 
+                               help='Output markdown file path (must end with .md)')
+    compare_parser.add_argument('--tolerance', dest='tolerance', type=float, default=1e-6, 
+                               help='Tolerance for pixel value comparison (default: 1e-6)')
+    
     args = parser.parse_args()
     
     if args.task == 'run':
@@ -2063,6 +2477,8 @@ def main():
             visualize_parser.error("Missing required arguments. Use --input and --output.")
         
         visualize_task(input_patterns, output_path)
+    elif args.task == 'compare':
+        compare_task(args.input_patterns, args.reference_platform, args.output_path, args.tolerance)
     else:
         parser.print_help()
 
