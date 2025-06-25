@@ -44,7 +44,11 @@
         "data": {
           "from_node": "reducedimension1"
         },
+<<<<<<< HEAD
         "format": "GTiff",
+=======
+        "format": "GTIFF",
+>>>>>>> d97ec9e (saving the new changes with advanced scenarios and its tests, updated openeotest.py)
         "options": {}
       },
       "result": true

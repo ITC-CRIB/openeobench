@@ -86,6 +86,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger('scenario_runner')
 
+def get_geotiff_files(directory):
+    """
+    Get all GeoTIFF files in a directory using gdalinfo or file command for proper detection.
+    Returns a list of file paths that are actual GeoTIFF files.
+    """
+    if not os.path.exists(directory):
+        return []
+    
+    geotiff_files = []
+    
+    # Get all files in the directory
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            # Skip auxiliary files
+            if file.endswith('.aux.xml') or file.endswith('.tif.aux.xml'):
+                continue
+                
+            file_path = os.path.join(root, file)
+            
+            # Try gdalinfo first (more reliable for GeoTIFF detection)
+            try:
+                result = subprocess.run(['gdalinfo', file_path], 
+                                      capture_output=True, text=True, timeout=10)
+                if result.returncode == 0 and 'TIFF' in result.stdout.upper():
+                    geotiff_files.append(file_path)
+                    continue
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+            
+            # Fallback to file command
+            try:
+                result = subprocess.run(['file', file_path], 
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    output = result.stdout.upper()
+                    if 'TIFF' in output and ('IMAGE' in output or 'DATA' in output):
+                        geotiff_files.append(file_path)
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+    
+    return geotiff_files
+
 def load_backends(backends_file):
     """Load backends from the backends.json file."""
     try:
@@ -449,165 +491,340 @@ def _save_results(results, output_directory, scenario_name, timestamp):
         logger.warning(f"Failed to save results: {e}")
 
 
-def summarize_task(input_patterns, output_path):
-    """Generate a summary report from output folders matching glob patterns."""
-    import statistics
-    logger.info(f"Summarizing results for patterns: {input_patterns}, output: {output_path}")
-
-    # Expand glob patterns to folder list
-    matched_folders = set()
-    for pattern in input_patterns:
-        # Always check the output directory first - this is where all data is stored
-        output_pattern = os.path.join("output", f"*{pattern}*")
+def summarize_task(patterns, output_path, debug=False):
+    """
+    Create summary from output folders.
+    
+    Args:
+        patterns: List of patterns to match folder names (within output/ directory)
+        output_path: Output path for the summary
+        debug: Whether to print debug information
+        
+    Returns:
+        True if successful, False if there were errors
+    """
+    # Always look in output/ directory first
+    base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+    
+    # Get matching folders
+    matched_folders = []
+    for pattern in patterns:
+        # Search in output directory with wildcards
+        output_pattern = os.path.join(base_dir, f"*{pattern}*")
         logger.info(f"Searching for pattern: {output_pattern}")
         output_matches = glob.glob(output_pattern)
-        for folder in output_matches:
-            if os.path.isdir(folder):
-                matched_folders.add(folder)
+        matched_folders.extend(output_matches)
         
-        # Also check direct pattern for flexibility
+        # Also search for direct pattern matches
         direct_matches = glob.glob(pattern)
-        for folder in direct_matches:
-            if os.path.isdir(folder):
-                matched_folders.add(folder)
+        matched_folders.extend(direct_matches)
     
+    # Remove duplicates and filter for directories only
+    matched_folders = list(set([f for f in matched_folders if os.path.isdir(f)]))
     matched_folders = sorted(matched_folders)
-    logger.info(f"Matched {len(matched_folders)} folders.")
     
-    if matched_folders:
-        # Print first few matches for confirmation
-        preview = ", ".join(os.path.basename(f) for f in list(matched_folders)[:5])
-        if len(matched_folders) > 5:
-            preview += f", ... ({len(matched_folders) - 5} more)"
-        logger.info(f"Found folders: {preview}")
-    else:
-        logger.error("No folders matched the input pattern(s). Please check the pattern and make sure the output directory exists.")
-        # List some folders in output dir for troubleshooting
-        try:
-            if os.path.exists("output"):
-                sample = [d for d in os.listdir("output") if os.path.isdir(os.path.join("output", d))][:10]
-                logger.info(f"Sample folders in output directory: {', '.join(sample)}")
-                logger.info(f"Try patterns like: *vienna*10km* or *{input_patterns[0]}*")
-        except Exception as e:
-            logger.error(f"Error listing output directory: {e}")
-        return
+    if not matched_folders:
+        logger.error(f"No folders matched the input pattern(s). Checked both output/ directory and direct patterns.")
+        return False
+    
+    logger.info(f"Found {len(matched_folders)} matching folders: {[os.path.basename(f) for f in matched_folders[:5]]}")
 
-    # Collect all results and all possible keys
-    all_results = []
-    all_keys = set()
-    for folder in matched_folders:
-        results_path = os.path.join(folder, "results.json")
-        if not os.path.isfile(results_path):
-            logger.warning(f"No results.json in {folder}, skipping.")
-            continue
-        try:
-            with open(results_path) as f:
-                data = json.load(f)
-            # Just use the folder name without the full path
-            data["_folder"] = os.path.basename(folder)
+    # Helper function to load folder data
+    def _load_folder_data(folder_path):
+        """Load data from results.json in the folder."""
+        results_file = os.path.join(folder_path, 'results.json')
+        if os.path.exists(results_file):
+            try:
+                with open(results_file, 'r') as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Error loading {results_file}: {e}")
+                return None
+        return None
+
+    # Helper function to extract backend name from folder name
+    def _extract_backend_from_folder(folder_name):
+        """Extract backend name from folder name."""
+        # Split by underscore and look for timestamp pattern (YYYYMMDDHHMMSS)
+        parts = folder_name.split('_')
+        
+        # Find timestamp (should be 14 digits)
+        timestamp_idx = -1
+        for i, part in enumerate(parts):
+            if len(part) == 14 and part.isdigit():
+                timestamp_idx = i
+                break
             
-            # Count TIFF files in the folder
-            tiff_files = glob.glob(os.path.join(folder, "*.tif")) + glob.glob(os.path.join(folder, "*.tiff"))
-            data["tiff_count"] = len(tiff_files)
+        if timestamp_idx > 0:
+            # Backend name should be the part just before timestamp
+            backend_part = parts[timestamp_idx - 1]
             
-            all_results.append(data)
-            all_keys.update(data.keys())
+            # Map common backend identifiers
+            backend_mapping = {
+                'cdse': 'CDSE',
+                'vito': 'VITO', 
+                'eodc': 'EODC',
+                'earthengine': 'Earth Engine',
+                'openeo_platform': 'openEO Platform',
+                'platform': 'openEO Platform'
+            }
+            
+            return backend_mapping.get(backend_part.lower(), backend_part.title())
+        
+        # Fallback: try to extract from URL part
+        if 'vito' in folder_name.lower():
+            return 'VITO'
+        elif 'eodc' in folder_name.lower():
+            return 'EODC'
+        elif 'dataspace' in folder_name.lower() or 'copernicus' in folder_name.lower():
+            return 'CDSE'
+        elif 'earthengine' in folder_name.lower():
+            return 'Earth Engine'
+        elif 'openeo' in folder_name.lower():
+            return 'openEO Platform'
+        
+        return 'Unknown'
+    
+    # Helper function to write CSV format
+    def _write_summary_csv(data, output_path, units):
+        """Write summary data to CSV format."""
+        if not data:
+            return False
+        
+        # Write main CSV file (include all data)
+        with open(output_path, 'w', newline='') as csvfile:
+            # Get all field names, ensuring _backend comes after _folder
+            all_fields = set()
+            for entry in data:
+                all_fields.update(entry.keys())
+            
+            # Order fields: _folder, _backend, then timing fields
+            ordered_fields = ['_folder', '_backend']
+            timing_fields = sorted([f for f in all_fields if f not in ['_folder', '_backend']])
+            ordered_fields.extend(timing_fields)
+            
+            writer = csv.DictWriter(csvfile, fieldnames=ordered_fields)
+            writer.writeheader()
+            writer.writerows(data)
+        
+        # Filter data for summary statistics: only include entries with more than 0 TIFF files
+        filtered_data = []
+        for entry in data:
+            tiff_count = entry.get('tiff_count [files]', 0)
+            try:
+                if float(tiff_count) > 0:
+                    filtered_data.append(entry)
+            except (ValueError, TypeError):
+                continue
+        
+        if not filtered_data:
+            logger.warning("No entries with more than 0 TIFF files found for summary statistics")
+            return True
+        
+        # Generate summary statistics BY BACKEND (only for successful jobs with >1 TIFF)
+        summary_data = []
+        timing_fields = [f for f in filtered_data[0].keys() if f not in ['_folder', '_backend']]
+        
+        # Group filtered data by backend
+        backend_groups = {}
+        for entry in filtered_data:
+            backend = entry.get('_backend', 'Unknown')
+            if backend not in backend_groups:
+                backend_groups[backend] = []
+            backend_groups[backend].append(entry)
+        
+        # Calculate statistics for each backend and metric combination
+        for backend, backend_entries in backend_groups.items():
+            for field in timing_fields:
+                values = []
+                for entry in backend_entries:
+                    if field in entry and entry[field] is not None:
+                        try:
+                            values.append(float(entry[field]))
+                        except (ValueError, TypeError):
+                            continue
+                
+                if values:
+                    summary_data.append({
+                        'backend': backend,
+                        'metric': field,
+                        'n': len(values),
+                        'min': min(values),
+                        'max': max(values),
+                        'average': sum(values) / len(values),
+                        'stddev': (sum((x - sum(values)/len(values))**2 for x in values) / len(values))**0.5 if len(values) > 1 else 0
+                    })
+        
+        # Write summary statistics CSV with backend grouping
+        summary_path = output_path.replace('.csv', '_summary.csv')
+        with open(summary_path, 'w', newline='') as csvfile:
+            if summary_data:
+                writer = csv.DictWriter(csvfile, fieldnames=['backend', 'metric', 'n', 'min', 'max', 'average', 'stddev'])
+                writer.writeheader()
+                writer.writerows(summary_data)
+        
+        return True
+    
+    # Helper function to write Markdown format
+    def _write_summary_markdown(data, output_path, units):
+        """Write summary data to Markdown format."""
+        if not data:
+            return False
+        
+        with open(output_path, 'w') as f:
+            f.write("# OpenEO Results Summary\n\n")
+            f.write(f"Generated on {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            
+            # Get all field names, ensuring _backend comes after _folder
+            all_fields = set()
+            for entry in data:
+                all_fields.update(entry.keys())
+            
+            # Order fields: _folder, _backend, then timing fields
+            ordered_fields = ['_folder', '_backend']
+            timing_fields = sorted([f for f in all_fields if f not in ['_folder', '_backend']])
+            ordered_fields.extend(timing_fields)
+            
+            # Write main results table (include all data)
+            f.write("## Folder Results\n\n")
+            
+            # Create table header
+            f.write("| " + " | ".join(ordered_fields) + " |\n")
+            f.write("|" + "---|" * len(ordered_fields) + "\n")
+            
+            # Write data rows
+            for entry in data:
+                row_values = []
+                for field in ordered_fields:
+                    value = entry.get(field, '')
+                    if isinstance(value, float):
+                        row_values.append(f"{value:.3f}")
+                    else:
+                        row_values.append(str(value))
+                f.write("| " + " | ".join(row_values) + " |\n")
+            
+            # Filter data for summary statistics: only include entries with more than 0 TIFF files
+            filtered_data = []
+            for entry in data:
+                tiff_count = entry.get('tiff_count [files]', 0)
+                try:
+                    if float(tiff_count) > 0:
+                        filtered_data.append(entry)
+                except (ValueError, TypeError):
+                    continue
+            
+            if not filtered_data:
+                f.write("\n## Summary Statistics by Backend\n\n")
+                f.write("*No entries with more than 0 TIFF files found for summary statistics.*\n")
+                return True
+            
+            # Generate and write summary statistics BY BACKEND (only for successful jobs)
+            f.write(f"\n## Summary Statistics by Backend\n\n")
+            f.write("*Note: Only includes entries with more than 0 TIFF files (successful jobs)*\n\n")
+            f.write("| backend | metric | n | min | max | average | stddev |\n")
+            f.write("|---|---|---|---|---|---|---|\n")
+            
+            # Group filtered data by backend
+            backend_groups = {}
+            for entry in filtered_data:
+                backend = entry.get('_backend', 'Unknown')
+                if backend not in backend_groups:
+                    backend_groups[backend] = []
+                backend_groups[backend].append(entry)
+            
+            # Calculate statistics for each backend and metric combination
+            for backend in sorted(backend_groups.keys()):
+                backend_entries = backend_groups[backend]
+                for field in timing_fields:
+                    values = []
+                    for entry in backend_entries:
+                        if field in entry and entry[field] is not None:
+                            try:
+                                values.append(float(entry[field]))
+                            except (ValueError, TypeError):
+                                continue
+                    
+                    if values:
+                        n = len(values)
+                        min_val = min(values)
+                        max_val = max(values)
+                        avg = sum(values) / len(values)
+                        stddev = (sum((x - avg)**2 for x in values) / len(values))**0.5 if len(values) > 1 else 0
+                        
+                        f.write(f"| {backend} | {field} | {n} | {min_val:.3f} | {max_val:.3f} | {avg:.3f} | {stddev:.3f} |\n")
+        
+        return True
+    
+    # Collect data from all matched folders
+    all_data = []
+    
+    for folder_path in matched_folders:
+        folder_name = os.path.basename(folder_path)
+        logger.info(f"Processing folder: {folder_name}")
+        
+        # Extract backend name from folder structure
+        backend_name = _extract_backend_from_folder(folder_name)
+        
+        # Count GeoTIFF files in the folder
+        tiff_files = get_geotiff_files(folder_path)
+        tiff_count = len(tiff_files)
+        
+        # Try to load existing data
+        try:
+            data = _load_folder_data(folder_path)
+            if data:
+                # Add folder name, backend name, and TIFF count to the data
+                data['_folder'] = folder_name
+                data['_backend'] = backend_name  # Add backend information
+                data['tiff_count'] = tiff_count
+                all_data.append(data)
+                logger.info(f"Loaded data from {folder_name} (backend: {backend_name}) - {tiff_count} TIFF files")
+            else:
+                logger.warning(f"No valid data found in {folder_name}")
         except Exception as e:
-            logger.warning(f"Failed to read {results_path}: {e}")
-
-    if not all_results:
-        logger.error("No valid results.json files found.")
-        return
-
-    # Define units for known timing/statistics fields
+            logger.error(f"Error processing {folder_path}: {e}")
+    
+    if not all_data:
+        logger.error("No valid data found in any matched folders")
+        return False
+    
+    logger.info(f"Successfully processed {len(all_data)} folders")
+    
+    # Define units for timing/statistics fields
     units = {
-        "submit_time": "seconds",
-        "start_time": "unix_seconds",
-        "start_job_time": "unix_seconds",
-        "job_execution_time": "seconds",
-        "download_time": "seconds",
-        "total_time": "seconds",
-        "queue_time": "seconds",
-        "processing_time": "seconds",
-        "download_timestamp": "datetime",
-        "timestamp": "datetime",
-        "tiff_count": "files",
+        'download_time': 'seconds',
+        'job_execution_time': 'seconds', 
+        'processing_time': 'seconds',
+        'queue_time': 'seconds',
+        'submit_time': 'seconds',
+        'total_time': 'seconds',
+        'tiff_count': 'files'
     }
-    # Add more units as needed
-
-    # Prepare CSV/Markdown columns: _folder first, then sorted keys
-    keys = ["_folder"] + [k for k in sorted(all_keys) if k in units]
-    # Add units to column names for timing/statistics fields
-    def colname_with_unit(k):
-        return f"{k} [{units[k]}]" if k in units else k
-    columns = [colname_with_unit(k) for k in keys]
-
-    # Prepare rows for CSV/Markdown
-    rows = []
-    for result in all_results:
-        row = []
-        for k in keys:
-            v = result.get(k, "")
-            # Format floats to 3 decimals for times
-            if isinstance(v, float) and k in units and units[k] == "seconds":
-                v = f"{v:.3f}"
-            row.append(v)
-        rows.append(row)
-
-    # Compute summary statistics for timing/statistics fields (float/int only)
-    stats_rows = []
-    for k in keys:
-        if k == "_folder":
-            continue
-        values = [result.get(k) for result in all_results]
-        # Only consider numeric values
-        numeric = [float(v) for v in values if isinstance(v, (int, float))]
-        if numeric:
-            n = len(numeric)
-            minv = min(numeric)
-            maxv = max(numeric)
-            meanv = statistics.mean(numeric)
-            stddev = statistics.stdev(numeric) if n > 1 else 0.0
-            stats_rows.append([
-                colname_with_unit(k), n, f"{minv:.3f}", f"{maxv:.3f}", f"{meanv:.3f}", f"{stddev:.3f}"
-            ])
-
-    # Output CSV or Markdown
-    if output_path.endswith(".csv"):
-        # Write per-folder CSV
-        csv_path = output_path
-        with open(csv_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(columns)
-            writer.writerows(rows)
-        logger.info(f"Wrote folder summary CSV: {csv_path}")
-        # Write summary statistics CSV
-        stats_path = os.path.splitext(csv_path)[0] + "_summary.csv"
-        with open(stats_path, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["metric", "n", "min", "max", "average", "stddev"])
-            writer.writerows(stats_rows)
-        logger.info(f"Wrote summary statistics CSV: {stats_path}")
-    elif output_path.endswith(".md"):
-        # Write Markdown report
-        md_path = output_path
-        with open(md_path, "w") as f:
-            f.write(f"# OpenEO Results Summary\n\n")
-            f.write(f"## Folder Results\n\n")
-            # Table header
-            f.write("| " + " | ".join(columns) + " |\n")
-            f.write("|" + "---|" * len(columns) + "\n")
-            for row in rows:
-                f.write("| " + " | ".join(str(x) for x in row) + " |\n")
-            f.write(f"\n## Summary Statistics\n\n")
-            f.write("| metric | n | min | max | average | stddev |\n")
-            f.write("|---|---|---|---|---|---|\n")
-            for srow in stats_rows:
-                f.write("| " + " | ".join(str(x) for x in srow) + " |\n")
-        logger.info(f"Wrote Markdown summary: {md_path}")
+    
+    # Filter data to only include folder name, backend, and timing/statistics fields
+    filtered_data = []
+    for entry in all_data:
+        filtered_entry = {
+            '_folder': entry['_folder'],
+            '_backend': entry.get('_backend', 'unknown')  # Include backend information
+        }
+        
+        # Add timing/statistics fields with units
+        for key, value in entry.items():
+            if key in units and key != '_folder' and key != '_backend':
+                unit_suffix = f" [{units[key]}]" if units[key] else ""
+                filtered_entry[f"{key}{unit_suffix}"] = value
+        
+        filtered_data.append(filtered_entry)
+    
+    # Determine output format
+    if output_path.lower().endswith('.csv'):
+        return _write_summary_csv(filtered_data, output_path, units)
+    elif output_path.lower().endswith('.md'):
+        return _write_summary_markdown(filtered_data, output_path, units)
     else:
-        logger.error("Output file must end with .csv or .md")
-
+        logger.error(f"Unsupported output format. Use .csv or .md extension")
+        return False
 def visualize_task(args):
     """
     Generate visualizations and statistics for output folders matching a pattern
@@ -802,31 +1019,14 @@ def visualize_task(input_patterns, output_path):
     # Find all GeoTIFF files in matched folders with improved file detection
     for folder in matched_folders:
         folder_name = os.path.basename(folder)
-        tiff_files = []
         
-        # Search with multiple patterns to ensure we find all GeoTIFF files
-        for ext in ['*.tif', '*.tiff', '*.TIF', '*.TIFF']:
-            tiff_files.extend(glob.glob(os.path.join(folder, ext)))
-            tiff_files.extend(glob.glob(os.path.join(folder, '**', ext), recursive=True))
+        # Use proper GeoTIFF detection instead of file extensions
+        tiff_files = get_geotiff_files(folder)
         
-        # Also look for files that might have GDAL-compatible formats but different extensions
-        for ext in ['*.img', '*.IMG', '*.jp2', '*.JP2']:
-            potential_files = glob.glob(os.path.join(folder, ext))
-            potential_files.extend(glob.glob(os.path.join(folder, '**', ext), recursive=True))
-            
-            # Filter to only include files GDAL can open if GDAL is available
-            if GDAL_AVAILABLE:
-                for file_path in potential_files:
-                    try:
-                        ds = gdal.Open(file_path)
-                        if ds is not None:
-                            tiff_files.append(file_path)
-                            ds = None
-                    except Exception:
-                        pass
-            else:
-                # If GDAL isn't available, include all potential raster files
-                tiff_files.extend(potential_files)
+        # Also check subdirectories recursively
+        for root, dirs, files in os.walk(folder):
+            if root != folder:  # Skip the main folder as we already processed it
+                tiff_files.extend(get_geotiff_files(root))
         
         if tiff_files:
             # Remove duplicates while preserving order
@@ -2018,24 +2218,16 @@ def _create_placeholder_image(output_path, filename, error_message):
 
 def get_tiff_files(folder_path):
     """
-    Get list of TIFF files from a folder, excluding auxiliary files.
+    Get list of GeoTIFF files from a folder using proper file type detection.
+    This function is kept for backward compatibility, but now uses the improved detection.
     
     Args:
         folder_path: Path to the folder
         
     Returns:
-        list: List of TIFF file paths (excluding .aux.xml files)
+        list: List of GeoTIFF file paths
     """
-    tiff_patterns = ['*.tif', '*.tiff', '*.TIF', '*.TIFF']
-    tiff_files = []
-    
-    for pattern in tiff_patterns:
-        files = glob.glob(os.path.join(folder_path, pattern))
-        # Filter out auxiliary files
-        files = [f for f in files if not f.endswith('.aux.xml')]
-        tiff_files.extend(files)
-    
-    return tiff_files
+    return get_geotiff_files(folder_path)
 
 def compare_geotiffs(ref_path, comp_path, tolerance=1e-6):
     """
@@ -2430,6 +2622,8 @@ def main():
     summarize_parser.add_argument('--output', dest='output_path', required=True, 
                                 
                                 help='Output file path (must end with .md or .csv)')
+    summarize_parser.add_argument('--debug', action='store_true', 
+                                help='Enable debug logging')
     # Support for old positional argument style
     summarize_parser.add_argument('input', nargs='?', help=argparse.SUPPRESS)
     summarize_parser.add_argument('output', nargs='?', help=argparse.SUPPRESS)
@@ -2467,7 +2661,7 @@ def main():
         if not input_patterns or not output_path:
             summarize_parser.error("Missing required arguments. Use --input and --output.")
         
-        summarize_task(input_patterns, output_path)
+        summarize_task(input_patterns, output_path, debug=getattr(args, 'debug', False))
     elif args.task == 'visualize':
         # Handle both new and old-style arguments
         input_patterns = args.input_patterns if hasattr(args, 'input_patterns') and args.input_patterns else [args.input]

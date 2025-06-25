@@ -3,6 +3,7 @@
     "loadcollection1": {
       "arguments": {
         "id": "SENTINEL2_L2A",
+<<<<<<< HEAD
         "properties": {
           "eo:cloud_cover": {
             "process_graph": {
@@ -19,6 +20,8 @@
             }
           }
         },
+=======
+>>>>>>> d97ec9e (saving the new changes with advanced scenarios and its tests, updated openeotest.py)
         "spatial_extent": {
           "east": 17.16130266236287,
           "north": 48.193645045045045,

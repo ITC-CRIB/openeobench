@@ -21,7 +21,7 @@
         "data": {
           "from_node": "loadcollection1"
         },
-        "format": "GTiff",
+        "format": "GTIFF",
         "options": {}
       },
       "process_id": "save_result",
