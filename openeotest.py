@@ -300,14 +300,7 @@ def run_task(api_url, scenario_path, output_directory=None):
             
             # Get the results
             job_results = job.get_results()
-            job_description = job.describe()
-            job_description_file = os.path.join(output_directory, "job-description.json")
-            try:
-                with open(job_description_file, 'w', encoding='utf-8') as f:
-                    json.dump(job_description, f, indent=2)
-                logger.info(f"Saved job description to {job_description_file}")
-            except Exception as e:
-                logger.warning(f"Failed to save job job decription: {e}")
+            
             # Get and save metadata
             metadata = job_results.get_metadata()
             '''
