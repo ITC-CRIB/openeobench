@@ -4,25 +4,6 @@
       "process_id": "load_collection",
       "arguments": {
         "id": "COPERNICUS/S2_HARMONIZED",
-<<<<<<< HEAD
-        "properties": {
-          "eo:cloud_cover": {
-            "process_graph": {
-              "gte1": {
-                "process_id": "gte",
-                "arguments": {
-                  "x": {
-                    "from_parameter": "value"
-                  },
-                  "y": 50
-                },
-                "result": true
-              }
-            }
-          }
-        },
-=======
->>>>>>> d97ec9e (saving the new changes with advanced scenarios and its tests, updated openeotest.py)
         "spatial_extent": {
           "east": 16.42543639316641,
           "north": 48.25324504504504,
@@ -133,11 +114,7 @@
                 "data": {
                   "from_parameter": "data"
                 },
-<<<<<<< HEAD
-                "label": "B08"
-=======
                 "label": "B8"
->>>>>>> d97ec9e (saving the new changes with advanced scenarios and its tests, updated openeotest.py)
               }
             },
             "arrayelement3": {
@@ -146,11 +123,7 @@
                 "data": {
                   "from_parameter": "data"
                 },
-<<<<<<< HEAD
-                "label": "B04"
-=======
                 "label": "B4"
->>>>>>> d97ec9e (saving the new changes with advanced scenarios and its tests, updated openeotest.py)
               }
             },
             "normalizeddifference1": {
@@ -197,11 +170,7 @@
         "data": {
           "from_node": "reducedimension3"
         },
-<<<<<<< HEAD
         "format": "GTiff",
-=======
-        "format": "GTIFF",
->>>>>>> d97ec9e (saving the new changes with advanced scenarios and its tests, updated openeotest.py)
         "options": {}
       },
       "result": true
