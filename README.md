@@ -1,86 +1,231 @@
-# OpenEO Checker
+# OpenEO Bench
 
-A simple Python utility for checking the availability and response times of OpenEO API endpoints.
+**⚠️ This project is under active development.**
 
-## Description
+A comprehensive benchmarking and testing tool for OpenEO backends and services.
 
-OpenEO Checker is a command-line tool that reads a CSV file containing OpenEO backend names and their API endpoints, tests each endpoint's availability, and outputs the results to a CSV file with response times and status codes.
+## Overview
 
-## Features
+OpenEO Bench provides four main functionalities:
 
-- Validates URLs before sending requests
-- Measures response time in milliseconds
-- Handles various error conditions (timeouts, connection errors)
-- Gracefully handles interruptions, saving partial results
-- Provides clear error messages and status codes
+- **Service Checking**: Test endpoint availability and response times
+- **Scenario Execution**: Run OpenEO workflows on backends  
+- **Run Summaries**: Analyze timing statistics from workflow executions
+- **Service Summaries**: Generate performance reports from endpoint checks
 
-## Requirements
+### Coming Soon
 
-- Python 3.x
-- `requests` library
+- **Process Analysis**: Check OpenEO process availability and compliance across backends
+- **Process Summaries**: Generate compliance reports for process implementations
 
 ## Installation
 
-1. Clone this repository or download the script files
-2. Install the required dependencies:
+### Using uv (recommended)
 
 ```bash
-pip install requests
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Clone and setup
+git clone <repository-url>
+cd openeobench
+
+# Install all dependencies (includes GDAL, OpenEO, etc.)
+uv sync
+
+# Run commands
+uv run python openeobench --help
+```
+
+### Using pip
+
+#### Option 1: Install all dependencies (full functionality)
+
+```bash
+git clone <repository-url>
+cd openeobench
+
+# Install from pyproject.toml (includes all dependencies)
+pip install -e .
+
+# Or install specific requirements
+pip install -r requirements.txt
+
+python openeobench --help
 ```
 
 ## Usage
 
+### Service Checking
+
+Test OpenEO endpoint availability and response times:
+
 ```bash
-python openeo-checker.py -i <input_csv_file> -o <output_directory>
+# Check endpoints from CSV file
+python openeobench service -i endpoints.csv -o results/
+
+# Check single endpoint
+python openeobench service -u https://openeo.dataspace.copernicus.eu/.well-known/openeo -o results/
 ```
 
-### Arguments
-
-- `-i, --input`: Path to the input CSV file (required)
-- `-o, --output`: Path to the output directory (required)
-
-### Input CSV Format
-
-The input CSV file must contain at least two columns:
-- `Backends`: Name of the OpenEO backend
-- `URL`: URL of the API endpoint to check
-
-Example:
+**Input CSV format:**
 ```csv
-Backends,URL
-copernicus-dataspace,https://openeo.dataspace.copernicus.eu/.well-known/openeo
-eodc,https://openeo.eodc.eu/.well-known/openeo
+URL
+https://openeo.dataspace.copernicus.eu/.well-known/openeo
+https://openeo.eodc.eu/.well-known/openeo
 ```
 
-### Output CSV Format
+### Scenario Execution
 
-The output CSV file will contain the following columns (semicolon-delimited):
-- `Backends`: Name of the OpenEO backend
-- `URL`: URL of the API endpoint
-- `Timestamp`: Unix timestamp of when the test was run
-- `Response Time (ms)`: Response time in milliseconds (if successful)
-- `HTTP Code`: HTTP status code or error message
-- `Reason`: Reason phrase for the HTTP status or error description
-- `Valid`: Boolean indicating if the endpoint returned a valid JSON response with a success status code
-- `Body Size (bytes)`: Size of the response body in bytes
-
-## Error Handling
-
-The script handles various error conditions:
-- Invalid URLs: Marked as "Invalid URL" in the HTTP Code column with "Invalid URL format" in the Reason column
-- Timeouts: Marked as "Timeout" in the HTTP Code column with "Request timed out" in the Reason column
-- Connection errors: Marked as "Request exception" in the HTTP Code column with the specific error message in the Reason column
-- For HTTP error responses (4xx, 5xx), the script attempts to extract error messages from JSON responses when available
-
-## Example
+Run OpenEO workflows on backends:
 
 ```bash
-python openeo-checker.py -i api-endpoint.csv -o output_directory
+python openeobench run --api-url https://openeo.dataspace.copernicus.eu -i scenario.json -o results/
 ```
 
-This will create a CSV file in the specified output directory with the current date as part of the filename (e.g., `2025-06-18_OpenEO-Checker.csv`).
+### Run Summaries
+
+Generate timing statistics from workflow executions:
+
+```bash
+python openeobench run-summary -i output/folder1 output/folder2 -o timing_summary.csv
+```
+
+**Output columns:** `filename`, `time_submit`, `time_submit_stddev`, `time_job_execution`, `time_job_execution_stddev`, `time_download`, `time_download_stddev`, `time_processing`, `time_processing_stddev`, `time_queue`, `time_queue_stddev`, `time_total`, `time_total_stddev`
+
+### Service Summaries
+
+Generate performance reports from endpoint checks:
+
+```bash
+# CSV output
+python openeobench service-summary -i results/ -o summary.csv
+
+# Markdown report
+python openeobench service-summary -i results/ -o summary.md
+```
+
+## Coming Soon
+
+### Process Analysis
+
+Check OpenEO process availability and compliance:
+
+```bash
+python openeobench process --url <api_url> --output <out>
+```
+
+**Output**: 
+- CSV file with columns: `process`, `level`, `status`, `compatibility`, `reason`
+- OpenEO API compliant JSON file with detailed process information
+
+### Enhanced Run Command
+
+Simplified execution with URL parameter:
+
+```bash
+python openeobench run --url <api_url> --input <graph.json> --output <out>
+```
+
+**Output**: Folder containing process graph (JSON), job metadata (JSON), and output files (GeoTIFF, etc.)
+
+### Enhanced Service Summary
+
+Extended service summary with format options:
+
+```bash
+python openeobench service-summary <input> --output <out> --format <format>
+```
+
+**Output**: 
+- CSV columns: `url`, `availability`, `avg_response_time`, `stddev_response_time`, `latency`, `latency_stddev`
+- Markdown document with formatted statistics
+
+### Process Summary
+
+Generate compliance reports for process implementations:
+
+```bash
+python openeobench process-summary <input,...> --output <out> --format <format>
+```
+
+**Output**: 
+- CSV columns: `backend`, `l1_available`, `l1_missing`, `l1_mismatch`, `l2_available`, `...`, `total_mismatch`
+- Markdown document with compliance analysis across backends
+
+## Commands Reference
+
+### Current Commands
+
+| Command | Description | Key Options | Dependencies |
+|---------|-------------|-------------|--------------|
+| `service` | Check endpoint availability | `-i` (CSV file), `-u` (single URL), `-o` (output dir) | `requests` |
+| `run` | Execute OpenEO scenarios | `--api-url` (backend), `-i` (scenario JSON), `-o` (output dir) | `openeo`, `gdal`, etc. |
+| `run-summary` | Timing statistics from runs | `-i` (result folders/files), `-o` (CSV output) | Basic Python |
+| `service-summary` | Performance reports | `-i` (results folder/CSV), `-o` (CSV/MD output) | Basic Python |
+
+### Coming Soon Commands
+
+| Command | Description | Key Options | Output Format |
+|---------|-------------|-------------|---------------|
+| `process` | Check process availability/compliance | `--url` (API URL), `--output` (directory) | CSV + JSON |
+| `process-summary` | Generate compliance reports | `<input,...>` (inputs), `--output`, `--format` | CSV/Markdown |
+| Enhanced `service-summary` | Extended statistics | `<input>`, `--output`, `--format` | CSV/Markdown |
+| Enhanced `run` | Simplified execution | `--url`, `--input`, `--output` | Folder structure |
+
+## Output Formats
+
+### Service Check Results
+- **Location**: `outputs/YYYY-MM-DD.csv` or `outputs/YYYY-MM-DD_single.csv`
+- **Columns**: URL, Timestamp, Response Time (ms), HTTP Code, Errors, Body Size (bytes)
+
+### Run Results  
+- **Location**: Organized in timestamped folders with `results.json`
+- **Contains**: Timing data, job status, process graphs, downloaded results
+
+### Summary Reports
+- **CSV**: Machine-readable statistics and timing data
+- **Markdown**: Human-readable formatted reports with tables
+
+## File Structure
+
+```
+openeobench/
+├── openeobench           # Main CLI script
+├── openeo_checker.py     # Core functionality
+├── openeotest.py         # Scenario execution engine
+├── scenarios/            # Test scenario definitions
+├── outputs/              # Service check results
+└── README.md
+```
+
+## Development Status
+
+Current areas of development:
+- Enhanced authentication flow testing
+
+
+## Requirements
+
+### System Requirements
+- Python 3.13+ (as specified in pyproject.toml)
+- GDAL system libraries (for geospatial functionality)
+
+### Python Dependencies
+
+**Core dependencies** (from pyproject.toml):
+- `requests>=2.32.4` - HTTP client for API calls
+- `openeo>=0.42.1` - OpenEO Python client
+- `gdal[numpy]==3.8.4` - Geospatial data processing
+- `numpy>=2.3.0` - Numerical computing
+- `matplotlib>=3.10.3` - Plotting and visualization
+- `rioxarray>=0.19.0` - Raster data handling
+
+### Installation Notes
+
+- **GDAL requirement**: May require system-level GDAL installation on some platforms
+- All commands require the full dependency set for proper functionality
 
 ## License
 
 MIT License
-
