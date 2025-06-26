@@ -105,21 +105,7 @@ python openeobench service-summary -i results/ -o summary.csv
 python openeobench service-summary -i results/ -o summary.md
 ```
 
-## Coming Soon
-
-### Process Analysis
-
-Check OpenEO process availability and compliance:
-
-```bash
-python openeobench process --url <api_url> --output <out>
-```
-
-**Output**: 
-- CSV file with columns: `process`, `level`, `status`, `compatibility`, `reason`
-- OpenEO API compliant JSON file with detailed process information
-
-### Enhanced Run Command
+### Run Command
 
 Simplified execution with URL parameter:
 
@@ -141,7 +127,7 @@ python openeobench service-summary <input> --output <out> --format <format>
 - CSV columns: `url`, `availability`, `avg_response_time`, `stddev_response_time`, `latency`, `latency_stddev`
 - Markdown document with formatted statistics
 
-### Process Summary
+### Process Summary (Coming soon)
 
 Generate compliance reports for process implementations:
 
@@ -152,6 +138,20 @@ python openeobench process-summary <input,...> --output <out> --format <format>
 **Output**: 
 - CSV columns: `backend`, `l1_available`, `l1_missing`, `l1_mismatch`, `l2_available`, `...`, `total_mismatch`
 - Markdown document with compliance analysis across backends
+
+### Process Analysis (Coming Soon)
+
+Check OpenEO process availability and compliance:
+
+```bash
+python openeobench process --url <api_url> --output <out>
+```
+
+**Output**: 
+- CSV file with columns: `process`, `level`, `status`, `compatibility`, `reason`
+- OpenEO API compliant JSON file with detailed process information
+
+
 
 ## Commands Reference
 
@@ -170,8 +170,6 @@ python openeobench process-summary <input,...> --output <out> --format <format>
 |---------|-------------|-------------|---------------|
 | `process` | Check process availability/compliance | `--url` (API URL), `--output` (directory) | CSV + JSON |
 | `process-summary` | Generate compliance reports | `<input,...>` (inputs), `--output`, `--format` | CSV/Markdown |
-| Enhanced `service-summary` | Extended statistics | `<input>`, `--output`, `--format` | CSV/Markdown |
-| Enhanced `run` | Simplified execution | `--url`, `--input`, `--output` | Folder structure |
 
 ## Output Formats
 
@@ -198,12 +196,6 @@ openeobench/
 ├── outputs/              # Service check results
 └── README.md
 ```
-
-## Development Status
-
-Current areas of development:
-- Enhanced authentication flow testing
-
 
 ## Requirements
 
