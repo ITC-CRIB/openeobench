@@ -61,41 +61,23 @@ python openeobench --help
 Test OpenEO endpoint availability and response times:
 
 ```bash
-# Check endpoints from CSV file
-python openeobench service -i endpoints.csv -o results/
+python openeobench service --url <apu_url> --output <out> --format <format>
+```
+Example:
 
+```bash
 # Check single endpoint
 python openeobench service -u https://openeo.dataspace.copernicus.eu/.well-known/openeo -o results/
 ```
 
-**Input CSV format:**
-```csv
-URL
-https://openeo.dataspace.copernicus.eu/.well-known/openeo
-https://openeo.eodc.eu/.well-known/openeo
-```
+### Service Summary
 
-### Scenario Execution
-
-Run OpenEO workflows on backends:
+Extended service summary with format options:
 
 ```bash
-python openeobench run --api-url https://openeo.dataspace.copernicus.eu -i scenario.json -o results/
+python openeobench service-summary <input> --output <out> --format <format>
 ```
-
-### Run Summaries
-
-Generate timing statistics from workflow executions:
-
-```bash
-python openeobench run-summary -i output/folder1 output/folder2 -o timing_summary.csv
-```
-
-**Output columns:** `filename`, `time_submit`, `time_submit_stddev`, `time_job_execution`, `time_job_execution_stddev`, `time_download`, `time_download_stddev`, `time_processing`, `time_processing_stddev`, `time_queue`, `time_queue_stddev`, `time_total`, `time_total_stddev`
-
-### Service Summaries
-
-Generate performance reports from endpoint checks:
+Example:
 
 ```bash
 # CSV output
@@ -105,27 +87,39 @@ python openeobench service-summary -i results/ -o summary.csv
 python openeobench service-summary -i results/ -o summary.md
 ```
 
-### Run Command
+**Output**: 
+- CSV columns: `url`, `availability`, `avg_response_time`, `stddev_response_time`, `latency`, `latency_stddev`
+- Markdown document with formatted statistics
 
-Simplified execution with URL parameter:
+### Scenario Execution
 
+Run OpenEO workflows on backends:
 ```bash
-python openeobench run --url <api_url> --input <graph.json> --output <out>
+openeobench run --url <api_url> --input <graph.json> --output <out>
+```
+
+Example:
+```bash
+python openeobench run --url https://openeo.dataspace.copernicus.eu -i scenario.json -o results/
 ```
 
 **Output**: Folder containing process graph (JSON), job metadata (JSON), and output files (GeoTIFF, etc.)
 
-### Enhanced Service Summary
 
-Extended service summary with format options:
+### Run Summaries
+
+Generate timing statistics from workflow executions:
 
 ```bash
-python openeobench service-summary <input> --output <out> --format <format>
+openeobench run-summary <input,...> --output <out> --format <format>
 ```
 
-**Output**: 
-- CSV columns: `url`, `availability`, `avg_response_time`, `stddev_response_time`, `latency`, `latency_stddev`
-- Markdown document with formatted statistics
+Example:
+```bash
+python openeobench run-summary -i output/folder1 output/folder2 -o timing_summary.csv
+```
+
+**Output columns:** `filename`, `time_submit`, `time_submit_stddev`, `time_job_execution`, `time_job_execution_stddev`, `time_download`, `time_download_stddev`, `time_processing`, `time_processing_stddev`, `time_queue`, `time_queue_stddev`, `time_total`, `time_total_stddev`
 
 ### Process Summary (Coming soon)
 
@@ -159,10 +153,10 @@ python openeobench process --url <api_url> --output <out>
 
 | Command | Description | Key Options | Dependencies |
 |---------|-------------|-------------|--------------|
-| `service` | Check endpoint availability | `-i` (CSV file), `-u` (single URL), `-o` (output dir) | `requests` |
-| `run` | Execute OpenEO scenarios | `--api-url` (backend), `-i` (scenario JSON), `-o` (output dir) | `openeo`, `gdal`, etc. |
-| `run-summary` | Timing statistics from runs | `-i` (result folders/files), `-o` (CSV output) | Basic Python |
-| `service-summary` | Performance reports | `-i` (results folder/CSV), `-o` (CSV/MD output) | Basic Python |
+| `service` | Check endpoint availability | `-i` (CSV file), `-u` (single URL), `-o` (output dir) |
+| `service-summary` | Performance reports | `-i` (results folder/CSV), `-o` (CSV/MD output) |
+| `run` | Execute OpenEO scenarios | `--api-url` (backend), `-i` (scenario JSON), `-o` (output dir) |
+| `run-summary` | Timing statistics from runs | `-i` (result folders/files), `-o` (CSV output) |
 
 ### Coming Soon Commands
 
