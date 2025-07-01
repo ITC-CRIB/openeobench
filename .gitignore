@@ -4,6 +4,9 @@ scenario_results.json
 scenario_runner.log
 output
 testing
-__pycache__/analyze_timing_statistics.cpython-311.pyc
-.pyc
-__pycache__
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
