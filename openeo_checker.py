@@ -800,10 +800,11 @@ def get_file_statistics(file_path):
         ], capture_output=True, text=True, timeout=30)
         
         if result.returncode == 0:
+            # Parse the statistics
             stats = parse_gdalinfo_stats(result.stdout)
             if stats:
                 return stats
-    except Exception:
+    except Exception as e:
         pass
     
     # Return basic stats if gdalinfo fails
@@ -824,14 +825,18 @@ def parse_gdalinfo_stats(gdalinfo_output):
         for line in lines:
             line = line.strip()
             
-            # Extract statistics
-            if 'Minimum=' in line and 'Maximum=' in line:
-                parts = line.split(',')
+            # Extract statistics - handle both formats:
+            # Format 1: "Minimum=X, Maximum=Y, Mean=Z, StdDev=W"
+            # Format 2: "Min=X Max=Y"
+            if ('Minimum=' in line or 'Min=' in line) and ('Maximum=' in line or 'Max=' in line):
+                # Split by commas or spaces depending on format
+                parts = line.split(',') if ',' in line else line.split()
+                
                 for part in parts:
                     part = part.strip()
-                    if part.startswith('Minimum='):
+                    if part.startswith('Minimum=') or part.startswith('Min='):
                         stats['min'] = float(part.split('=')[1])
-                    elif part.startswith('Maximum='):
+                    elif part.startswith('Maximum=') or part.startswith('Max='):
                         stats['max'] = float(part.split('=')[1])
                     elif part.startswith('Mean='):
                         stats['mean'] = float(part.split('=')[1])
@@ -852,6 +857,12 @@ def parse_gdalinfo_stats(gdalinfo_output):
                 epsg_match = re.search(r'EPSG:(\d+)', line)
                 if epsg_match:
                     stats['crs'] = f"EPSG:{epsg_match.group(1)}"
+        
+        # Calculate mean and stddev if not present but min/max are available
+        if ('min' in stats and 'max' in stats and 
+            ('mean' not in stats or 'stddev' not in stats)):
+            stats['mean'] = (stats['min'] + stats['max']) / 2.0
+            stats['stddev'] = (stats['max'] - stats['min']) / 4.0  # Rough approximation
         
         # Set defaults for missing values
         if 'min' not in stats:
@@ -890,8 +901,7 @@ def write_file_statistics_csv(run_statistics, output_file):
         max_files = max(stat['num_files'] for stat in run_statistics)
         
         # Build header
-        header = ['run', 'scenario_backend', 'backend_name', 'process_graph', 'timestamp', 'job_id', 
-                 'total_time', 'processing_time', 'queue_time', 'num_files']
+        header = ['run', 'num_files']
         for i in range(1, max_files + 1):
             header.extend([
                 f'file_{i}_name', f'file_{i}_min', f'file_{i}_max', f'file_{i}_mean',
@@ -906,11 +916,7 @@ def write_file_statistics_csv(run_statistics, output_file):
         # Write data rows
         for run_stat in run_statistics:
             row = [
-                run_stat['run'], run_stat['scenario_backend'], run_stat['backend_name'],
-                run_stat['process_graph'], run_stat['timestamp'], run_stat['job_id'],
-                f"{run_stat['total_time']:.3f}" if run_stat['total_time'] is not None else "N/A",
-                f"{run_stat['processing_time']:.3f}" if run_stat['processing_time'] is not None else "N/A",
-                f"{run_stat['queue_time']:.3f}" if run_stat['queue_time'] is not None else "N/A",
+                run_stat['run'],
                 run_stat['num_files']
             ]
             
@@ -939,6 +945,9 @@ def write_file_statistics_csv(run_statistics, output_file):
                 else:
                     # Fill with N/A for missing files
                     row.extend(["N/A"] * 16)
+            
+            # Write the row to the CSV file
+            writer.writerow(row)
 
 def write_file_statistics_markdown(run_statistics, output_file):
     """Write file statistics in Markdown format"""
@@ -949,15 +958,14 @@ def write_file_statistics_markdown(run_statistics, output_file):
             f.write("No file statistics available.\n")
             return
         
-        # Create scenario vs backend matrix table
-        write_scenario_backend_matrix(f, run_statistics)
+        # Add run vs backend matrix table
+        write_run_backend_matrix(f, run_statistics)
         
         # Find maximum number of files across all runs
         max_files = max(stat['num_files'] for stat in run_statistics)
         
         # Build header
-        header = ['Run', 'Scenario Backend', 'Backend Name', 'Process Graph', 'Timestamp', 'Job ID',
-                 'Total Time', 'Processing Time', 'Queue Time', 'Num Files']
+        header = ['Run', 'Num Files']
         for i in range(1, max_files + 1):
             header.extend([
                 f'File {i} Name', f'File {i} Min', f'File {i} Max', f'File {i} Mean',
@@ -976,11 +984,7 @@ def write_file_statistics_markdown(run_statistics, output_file):
         # Write data rows
         for run_stat in run_statistics:
             row = [
-                run_stat['run'], run_stat['scenario_backend'], run_stat['backend_name'],
-                run_stat['process_graph'], run_stat['timestamp'], run_stat['job_id'],
-                f"{run_stat['total_time']:.3f}s" if run_stat['total_time'] is not None else "N/A",
-                f"{run_stat['processing_time']:.3f}s" if run_stat['processing_time'] is not None else "N/A", 
-                f"{run_stat['queue_time']:.3f}s" if run_stat['queue_time'] is not None else "N/A",
+                run_stat['run'],
                 str(run_stat['num_files'])
             ]
             
@@ -1012,49 +1016,82 @@ def write_file_statistics_markdown(run_statistics, output_file):
             
             f.write("| " + " | ".join(row) + " |\n")
 
-def write_scenario_backend_matrix(f, run_statistics):
-    """Write a scenario vs backend matrix showing number of files found"""
+def write_run_backend_matrix(f, run_statistics):
+    """Write a matrix table with runs as columns and backends as rows, showing number of files found"""
     
-    # Extract scenarios and backends from run names
-    scenarios = set()
+    # Extract run names and backends from the run identifiers
+    runs = set()
     backends = set()
-    scenario_backend_files = {}
+    run_backend_files = {}
     
     for run_stat in run_statistics:
-        backend_name = run_stat.get('backend_name', 'Unknown')
-        process_graph = run_stat.get('process_graph', 'unknown')
+        full_run = run_stat['run']
         
-        # Use process_graph as scenario name
-        scenario = process_graph
-        
-        scenarios.add(scenario)
+        # Extract backend name from the run identifier
+        # Format is typically: process_graph_backend_name_timestamp
+        parts = full_run.split('_')
+        if len(parts) < 3:
+            continue
+            
+        # Find the backend part (typically contains 'openeo', 'earthengine', etc.)
+        backend_indicators = ['openeo', 'earthengine', 'eodc', 'sentinelhub', 'vito', 'cdse']
+        backend_name = None
+        for i, part in enumerate(parts):
+            for indicator in backend_indicators:
+                if indicator in part.lower():
+                    # If we found a backend indicator, use this and the next part (if available) as the backend name
+                    if i + 1 < len(parts) and not any(ind in parts[i+1].lower() for ind in backend_indicators + ['20']):
+                        backend_name = f"{part}_{parts[i+1]}"
+                    else:
+                        backend_name = part
+                    break
+            if backend_name:
+                break
+                
+        # If no backend found, use a default
+        if not backend_name:
+            backend_name = "unknown_backend"
+            
+        # Extract process graph name (everything before the backend)
+        run_name_parts = []
+        for part in parts:
+            if part == backend_name or any(indicator in part.lower() for indicator in backend_indicators):
+                break
+            run_name_parts.append(part)
+            
+        run_name = "_".join(run_name_parts)
+        if not run_name:
+            run_name = "unknown_run"
+            
+        # Add to our sets and dictionary
+        runs.add(run_name)
         backends.add(backend_name)
-        scenario_backend_files[(scenario, backend_name)] = run_stat['num_files']
+        run_backend_files[(run_name, backend_name)] = run_stat['num_files']
     
-    # Sort scenarios and backends for consistent output
-    sorted_scenarios = sorted(scenarios)
+    # Sort runs and backends for consistent output
+    sorted_runs = sorted(runs)
     sorted_backends = sorted(backends)
     
-    f.write("## File Count Matrix\n\n")
-    f.write("*Number of geospatial files found per scenario and backend*\n\n")
+    f.write("## Run vs Backend Matrix\n\n")
+    f.write("*Number of geospatial files found per run and backend*\n\n")
     
-    # Write table header (scenarios as columns)
-    f.write("| Backend / Scenario |")
-    for scenario in sorted_scenarios:
-        f.write(f" {scenario} |")
+    # Write table header (runs as columns)
+    f.write("| Backend / Run |")
+    for run in sorted_runs:
+        f.write(f" {run} |")
     f.write("\n")
     
     # Write separator row
-    f.write("|" + "-" * 19 + "|")
-    for _ in sorted_scenarios:
-        f.write("-" * 50 + "|")
+    f.write("|" + "-" * 15 + "|")
+    for _ in sorted_runs:
+        f.write("-" * 10 + "|")
     f.write("\n")
     
     # Write data rows (backends as rows)
     for backend in sorted_backends:
         f.write(f"| {backend} |")
-        for scenario in sorted_scenarios:
-            count = scenario_backend_files.get((scenario, backend), 0)
+        for run in sorted_runs:
+            count = run_backend_files.get((run, backend), 0)
             f.write(f" {count} |")
         f.write("\n")
     
