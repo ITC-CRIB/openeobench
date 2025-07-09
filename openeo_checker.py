@@ -365,7 +365,6 @@ def calculate_statistics_flexible(input_paths, output_file, start_date=None, end
     return calculate_statistics_from_files(input_paths[0] if input_paths else output_file, start_date, end_date, output_file)
 
 def run_openeo_scenario(api_url, input_path, output_directory=None):
-   def run_openeo_scenario(api_url, input_path, output_directory=None):
     """
     Wrapper function to run OpenEO scenarios using openeotest functionality.
     This function imports and calls the run_task from openeotest.py
@@ -391,7 +390,6 @@ def run_summary_task(input_paths, output_file, output_format='csv'):
     """
     import glob
     import json
-    from collections import defaultdict
     
     # Find all results.json files
     results_files = []
@@ -400,6 +398,17 @@ def run_summary_task(input_paths, output_file, output_format='csv'):
             if input_path.endswith("results.json"):
                 results_files.append(input_path)
         elif os.path.isdir(input_path):
+            # Check if directory contains geospatial files
+            has_geo_files, geo_files = has_geospatial_files(input_path)
+            if has_geo_files:
+                print(f"Found {len(geo_files)} geospatial files in {input_path}")
+                for geo_file in geo_files[:3]:  # Show first 3 files
+                    print(f"  - {os.path.basename(geo_file)}")
+                if len(geo_files) > 3:
+                    print(f"  ... and {len(geo_files) - 3} more files")
+            else:
+                print(f"No geospatial files found in {input_path}")
+            
             pattern = os.path.join(input_path, "**/results.json")
             found_files = glob.glob(pattern, recursive=True)
             results_files.extend(found_files)
@@ -622,7 +631,6 @@ def result_summary_task(input_paths, output_file, output_format='csv'):
     import glob
     import json
     import subprocess
-    from collections import defaultdict
 
     # Find all results.json files
     results_files = []
@@ -1006,7 +1014,6 @@ def write_file_statistics_markdown(run_statistics, output_file):
 
 def write_scenario_backend_matrix(f, run_statistics):
     """Write a scenario vs backend matrix showing number of files found"""
-    from collections import defaultdict
     
     # Extract scenarios and backends from run names
     scenarios = set()
@@ -1014,7 +1021,6 @@ def write_scenario_backend_matrix(f, run_statistics):
     scenario_backend_files = {}
     
     for run_stat in run_statistics:
-        run_name = run_stat['run']
         backend_name = run_stat.get('backend_name', 'Unknown')
         process_graph = run_stat.get('process_graph', 'unknown')
         
@@ -1053,6 +1059,51 @@ def write_scenario_backend_matrix(f, run_statistics):
         f.write("\n")
     
     f.write("\n")
+
+def has_geospatial_files(directory_path):
+    """
+    Check if a directory contains geospatial files.
+    
+    Args:
+        directory_path (str): Path to the directory to check
+        
+    Returns:
+        tuple: (has_files, file_list) where has_files is boolean and file_list contains found geospatial files
+    """
+    import glob
+    import subprocess
+    
+    if not os.path.isdir(directory_path):
+        return False, []
+    
+    geospatial_files = []
+    
+    # Common geospatial file extensions
+    geospatial_extensions = ['*.tif', '*.tiff', '*.nc', '*.hdf', '*.h5', '*.jp2', '*.img', '*.bil', '*.bsq', '*.bip']
+    
+    # Check for files with known geospatial extensions
+    for pattern in geospatial_extensions:
+        found_files = glob.glob(os.path.join(directory_path, pattern))
+        geospatial_files.extend(found_files)
+    
+    # Check for files without extensions that might be raster files
+    # Some backends return raster files without standard extensions
+    all_files = [f for f in os.listdir(directory_path) if os.path.isfile(os.path.join(directory_path, f))]
+    for file_name in all_files:
+        if (not any(file_name.endswith(ext[1:]) for ext in geospatial_extensions) and  # Remove * from extensions
+            not any(file_name.endswith(ext) for ext in ['.json', '.xml', '.txt', '.log', '.md']) and
+            '.' not in file_name and file_name not in [os.path.basename(f) for f in geospatial_files]):
+            file_path = os.path.join(directory_path, file_name)
+            # Test if it's a raster file using gdalinfo
+            try:
+                result = subprocess.run(['gdalinfo', file_path], 
+                                      capture_output=True, text=True, timeout=10)
+                if result.returncode == 0 and "Driver:" in result.stdout:
+                    geospatial_files.append(file_path)
+            except Exception:
+                continue
+    
+    return len(geospatial_files) > 0, geospatial_files
 
 def main():
     # Parse command line arguments
