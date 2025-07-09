@@ -1,26 +1,45 @@
 #!/usr/bin/python3
 
 # Import the functions from openeo_checker.py
+import argparse
+import os
+import sys
+
 from openeo_checker import (
-    process_single_url, 
-    process_csv, 
     calculate_statistics_flexible,
+    process_csv,
+    process_single_url,
+    result_summary_task,  # Used in result-summary command
     run_openeo_scenario,  # Used in run command
-    run_summary_task  # Used in run-summary command
+    run_summary_task,  # Used in run-summary command
 )
 
-import sys
-import os
-import argparse
+# Import process checking functions
+from process_checker import (
+    check_backend_processes,
+    process_backends_from_csv,
+    process_single_backend,
+)
+from process_summary import (
+    generate_process_summary,
+    load_process_results,
+    write_csv_summary,
+    write_markdown_summary,
+)
 
 # Add the current directory to the Python path so we can import openeo-checker
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+except NameError:
+    # Handle case when __file__ is not defined (e.g., when running with exec)
+    sys.path.insert(0, os.getcwd())
 
 import datetime
 
+
 def main():
     parser = argparse.ArgumentParser(
-        description='OpenEO Bench - Benchmarking and testing tool for OpenEO endpoints',
+        description="OpenEO Bench - Benchmarking and testing tool for OpenEO endpoints",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -36,6 +55,12 @@ Examples:
   # Generate timing summary from run results
   openeobench run-summary -i output/folder1 output/folder2 -o timing_summary.csv
   
+  # Generate file statistics summary from run results (CSV)
+  openeobench result-summary output/folder1 output/folder2 --output file_stats.csv
+  
+  # Generate file statistics summary from run results (Markdown)
+  openeobench result-summary output/folder1 output/folder2 --output file_stats.md --format md
+  
   # Generate statistics summary from folder (CSV output)
   openeobench service-summary -i results/ -o summary.csv
   
@@ -44,42 +69,147 @@ Examples:
   
   # Generate statistics from single CSV file
   openeobench service-summary -i results/2025-06-26.csv -o summary.md
-        """
+  
+  # Check process compliance for single backend
+  openeobench process --url https://openeo.vito.be/openeo/1.1 -o process_results.csv
+  
+  # Check process compliance for multiple backends
+  openeobench process -i backends.csv -o process_compliance.csv
+  
+  # Generate process compliance summary (CSV)
+  openeobench process-summary process_results/ --output process_summary.csv --format csv
+  
+  # Generate process compliance summary (Markdown)  
+  openeobench process-summary process_results/ --output process_summary.md --format md
+        """,
     )
-    
-    subparsers = parser.add_subparsers(dest='command', help='Available commands')
-    
+
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
     # Service command (equivalent to check)
-    service_parser = subparsers.add_parser('service', help='Check OpenEO service endpoints')
+    service_parser = subparsers.add_parser(
+        "service", help="Check OpenEO service endpoints"
+    )
     service_group = service_parser.add_mutually_exclusive_group(required=True)
-    service_group.add_argument('-i', '--input', help='Input CSV file with URL column')
-    service_group.add_argument('-u', '--url', help='Single URL to test')
-    service_parser.add_argument('-o', '--output', required=True, help='Output directory to write results')
-    service_parser.add_argument('-n', '--name', help='Backend name for single URL (optional, defaults to hostname)')
-    
+    service_group.add_argument("-i", "--input", help="Input CSV file with URL column")
+    service_group.add_argument("-u", "--url", help="Single URL to test")
+    service_parser.add_argument(
+        "-o", "--output", required=True, help="Output directory to write results"
+    )
+    service_parser.add_argument(
+        "-n",
+        "--name",
+        help="Backend name for single URL (optional, defaults to hostname)",
+    )
+
     # Run command (equivalent to openeotest run, but with renamed --scenario to --input)
-    run_parser = subparsers.add_parser('run', help='Run OpenEO scenarios on backends')
-    run_parser.add_argument('--api-url', required=True, help='URL of the OpenEO backend')
-    run_parser.add_argument('-i', '--input', required=True, help='Path to the process graph JSON file (scenario)')
-    run_parser.add_argument('-o', '--output', help='Output directory for results (optional)')
-    
+    run_parser = subparsers.add_parser("run", help="Run OpenEO scenarios on backends")
+    run_parser.add_argument(
+        "--api-url", required=True, help="URL of the OpenEO backend"
+    )
+    run_parser.add_argument(
+        "-i",
+        "--input",
+        required=True,
+        help="Path to the process graph JSON file (scenario)",
+    )
+    run_parser.add_argument(
+        "-o", "--output", help="Output directory for results (optional)"
+    )
+
     # Run Summary command (equivalent to openeotest summarize)
-    run_summary_parser = subparsers.add_parser('run-summary', help='Generate timing summary from OpenEO run results')
-    run_summary_parser.add_argument('-i', '--input', required=True, nargs='+', help='List of result folders or files')
-    run_summary_parser.add_argument('-o', '--output', required=True, help='Output CSV file')
-    
+    run_summary_parser = subparsers.add_parser(
+        "run-summary", help="Generate timing summary from OpenEO run results"
+    )
+    run_summary_parser.add_argument(
+        "-i",
+        "--input",
+        required=True,
+        nargs="+",
+        help="List of result folders or files",
+    )
+    run_summary_parser.add_argument(
+        "-o", "--output", required=True, help="Output file (.csv or .md)"
+    )
+    run_summary_parser.add_argument(
+        "--format",
+        choices=["csv", "md"],
+        default="csv",
+        help="Output format: csv or md (markdown)",
+    )
+
+    # Result Summary command - comprehensive analysis of OpenEO results
+    result_summary_parser = subparsers.add_parser(
+        "result-summary",
+        help="Generate comprehensive summary statistics from OpenEO result outputs",
+    )
+    result_summary_parser.add_argument(
+        "input", nargs="+", help="List of result folders or files to analyze"
+    )
+    result_summary_parser.add_argument(
+        "--output", required=True, help="Output file (.csv or .md)"
+    )
+    result_summary_parser.add_argument(
+        "--format",
+        choices=["csv", "md"],
+        default="csv",
+        help="Output format: csv or md (markdown)",
+    )
+
     # Service Summary command (equivalent to stats)
-    summary_parser = subparsers.add_parser('service-summary', help='Generate statistics summary from service check results')
-    summary_parser.add_argument('-i', '--input', required=True, help='Input folder containing CSV files or a single CSV file')
-    summary_parser.add_argument('-o', '--output', required=True, help='Output file (.csv or .md) to write statistics results')
+    summary_parser = subparsers.add_parser(
+        "service-summary", help="Generate statistics summary from service check results"
+    )
+    summary_parser.add_argument(
+        "-i",
+        "--input",
+        required=True,
+        help="Input folder containing CSV files or a single CSV file",
+    )
+    summary_parser.add_argument(
+        "-o",
+        "--output",
+        required=True,
+        help="Output file (.csv or .md) to write statistics results",
+    )
+
+    # Process command - check process availability and compliance
+    process_parser = subparsers.add_parser(
+        "process", help="Check OpenEO process availability and compliance"
+    )
+    process_group = process_parser.add_mutually_exclusive_group(required=True)
+    process_group.add_argument(
+        "-i", "--input", help="Input CSV file with backend information"
+    )
+    process_group.add_argument("--url", help="API URL for single backend check")
+    process_parser.add_argument(
+        "-o",
+        "--output",
+        required=True,
+        help="Base output filename (generates both .csv and .json files)",
+    )
+
+    # Process Summary command - cross-backend process compliance summary
+    process_summary_parser = subparsers.add_parser(
+        "process-summary", help="Generate cross-backend process compliance summary"
+    )
+    process_summary_parser.add_argument(
+        "input", nargs="+", help="Input directories or files with process check results"
+    )
+    process_summary_parser.add_argument(
+        "--output", required=True, help="Output file (.csv or .md)"
+    )
+    process_summary_parser.add_argument(
+        "--format", choices=["csv", "md"], help="Output format (csv or md)"
+    )
 
     args = parser.parse_args()
-    
+
     if not args.command:
         parser.print_help()
         return 1
-    
-    if args.command == 'service':
+
+    if args.command == "service":
         # Check if output directory exists, create it if it doesn't
         output_dir = args.output
         if not os.path.exists(output_dir):
@@ -87,7 +217,7 @@ Examples:
 
         # Get date in YYYY-MM-DD format
         date = datetime.datetime.now().strftime("%Y-%m-%d")
-        
+
         if args.url:
             # Single URL mode
             output_csv = os.path.join(output_dir, f"{date}_single.csv")
@@ -96,35 +226,91 @@ Examples:
             # CSV file mode
             output_csv = os.path.join(output_dir, f"{date}.csv")
             process_csv(args.input, output_csv)
-    
-    elif args.command == 'run':
+
+    elif args.command == "run":
         # Run OpenEO scenario
         result = run_openeo_scenario(args.api_url, args.input, args.output)
         if result is None:
             return 1
         else:
             print(f"Scenario completed with status: {result.get('status', 'unknown')}")
-            if result.get('status') == 'completed':
-                print(f"Results saved to: {result.get('file_path', 'unknown location')}")
-    
-    elif args.command == 'run-summary':
+            if result.get("status") == "completed":
+                print(
+                    f"Results saved to: {result.get('file_path', 'unknown location')}"
+                )
+
+    elif args.command == "run-summary":
         # Generate run summary from OpenEO result folders/files
-        success = run_summary_task(args.input, args.output)
+        success = run_summary_task(args.input, args.output, args.format)
         if not success:
             return 1
-    
-    elif args.command == 'service-summary':
+
+    elif args.command == "result-summary":
+        # Generate comprehensive result summary from OpenEO result outputs
+        success = result_summary_task(args.input, args.output, args.format)
+        if not success:
+            return 1
+
+    elif args.command == "service-summary":
         # Validate that the input path exists
         if not os.path.exists(args.input):
             print(f"Error: Input path '{args.input}' does not exist")
             return 1
-        
+
         # Calculate statistics and write to file
         success = calculate_statistics_flexible(args.input, args.output)
         if not success:
             return 1
-    
+
+    elif args.command == "process":
+        # Check process availability and compliance
+        if args.url:
+            from urllib.parse import urlparse
+
+            parsed_url = urlparse(args.url)
+            backend_name = (
+                parsed_url.netloc.split(".")[0] if parsed_url.netloc else "unknown"
+            )
+            process_single_backend(backend_name, args.url, args.output)
+        else:
+            # Multiple backends from CSV
+            process_backends_from_csv(args.input, args.output)
+
+    elif args.command == "process-summary":
+        # Generate cross-backend process compliance summary
+        # Validate input paths
+        for input_path in args.input:
+            if not os.path.exists(input_path):
+                print(f"Error: Input path '{input_path}' does not exist")
+                return 1
+
+        # Load results from all inputs
+        results = []
+        for input_path in args.input:
+            input_results = load_process_results(input_path)
+            results.extend(input_results)
+
+        if not results:
+            print("No process results found")
+            return 1
+
+        summary = generate_process_summary(results)
+
+        # Determine output format
+        output_format = args.format if hasattr(args, "format") and args.format else None
+        if not output_format:
+            output_format = "md" if args.output.endswith(".md") else "csv"
+
+        # Write output
+        if output_format == "md":
+            write_markdown_summary(summary, args.output)
+        else:
+            write_csv_summary(summary, args.output)
+
+        print(f"Process summary saved to: {args.output}")
+
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

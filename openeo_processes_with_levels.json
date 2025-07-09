@@ -1,0 +1,1157 @@
+{
+  "metadata": {
+    "source": "https://openeo.org/documentation/1.0/processes.json",
+    "generation_method": "realistic_complexity_based_assignment",
+    "total_processes": 149,
+    "level_distribution": {
+      "L1": 44,
+      "L2": 21,
+      "L3": 48,
+      "L4": 36
+    },
+    "experimental_distribution": {
+      "L1": 0,
+      "L2": 0,
+      "L3": 1,
+      "L4": 35
+    },
+    "description": "Process levels designed to match realistic L1-L4 distribution"
+  },
+  "process_levels": {
+    "absolute": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "add_dimension": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "add": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "aggregate_spatial": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "aggregate"
+      ]
+    },
+    "aggregate_temporal_period": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "aggregate",
+        "climatology",
+        "cubes"
+      ]
+    },
+    "aggregate_temporal": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "aggregate"
+      ]
+    },
+    "all": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "logic",
+        "reducer"
+      ]
+    },
+    "and": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "logic"
+      ]
+    },
+    "anomaly": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "climatology",
+        "cubes",
+        "math"
+      ]
+    },
+    "any": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "logic",
+        "reducer"
+      ]
+    },
+    "apply_dimension": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "apply_kernel": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "math > image filter"
+      ]
+    },
+    "apply_neighborhood": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "apply": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "arccos": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "arcosh": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "arcsin": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "arctan": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "arctan2": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "array_append": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays"
+      ]
+    },
+    "array_apply": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays"
+      ]
+    },
+    "array_concat": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays"
+      ]
+    },
+    "array_contains": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "comparison",
+        "reducer"
+      ]
+    },
+    "array_create": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "arrays"
+      ]
+    },
+    "array_element": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "reducer"
+      ]
+    },
+    "array_filter": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "filter"
+      ]
+    },
+    "array_find": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "reducer"
+      ]
+    },
+    "array_interpolate_linear": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "math",
+        "math > interpolation"
+      ]
+    },
+    "array_labels": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays"
+      ]
+    },
+    "arsinh": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "artanh": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "between": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "comparison"
+      ]
+    },
+    "ceil": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > rounding"
+      ]
+    },
+    "climatological_normal": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "climatology"
+      ]
+    },
+    "clip": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "constant": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > constants"
+      ]
+    },
+    "cos": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "cosh": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "count": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "math > statistics",
+        "reducer"
+      ]
+    },
+    "create_data_cube": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "dimension_labels": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "divide": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "drop_dimension": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "e": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > constants",
+        "math > exponential & logarithmic"
+      ]
+    },
+    "eq": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "texts",
+        "comparison"
+      ]
+    },
+    "exp": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > exponential & logarithmic"
+      ]
+    },
+    "extrema": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > statistics"
+      ]
+    },
+    "filter_bands": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "filter"
+      ]
+    },
+    "filter_bbox": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "filter"
+      ]
+    },
+    "filter_spatial": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "filter"
+      ]
+    },
+    "filter_temporal": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "filter"
+      ]
+    },
+    "first": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "reducer"
+      ]
+    },
+    "floor": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > rounding"
+      ]
+    },
+    "gt": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "comparison"
+      ]
+    },
+    "gte": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "comparison"
+      ]
+    },
+    "if": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "logic",
+        "comparison",
+        "masks"
+      ]
+    },
+    "int": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math",
+        "math > rounding"
+      ]
+    },
+    "is_nan": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "comparison",
+        "math > constants"
+      ]
+    },
+    "is_nodata": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "comparison"
+      ]
+    },
+    "is_valid": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "comparison"
+      ]
+    },
+    "last": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "reducer"
+      ]
+    },
+    "linear_scale_range": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "ln": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > exponential & logarithmic"
+      ]
+    },
+    "load_collection": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "import"
+      ]
+    },
+    "log": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > exponential & logarithmic"
+      ]
+    },
+    "lt": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "comparison"
+      ]
+    },
+    "lte": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "comparison"
+      ]
+    },
+    "mask_polygon": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "masks"
+      ]
+    },
+    "mask": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "masks"
+      ]
+    },
+    "max": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math",
+        "math > statistics",
+        "reducer"
+      ]
+    },
+    "mean": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > statistics",
+        "reducer"
+      ]
+    },
+    "median": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > statistics",
+        "reducer"
+      ]
+    },
+    "merge_cubes": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "min": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math",
+        "math > statistics",
+        "reducer"
+      ]
+    },
+    "mod": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "multiply": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "ndvi": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "math > indices",
+        "vegetation indices"
+      ]
+    },
+    "neq": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "texts",
+        "comparison"
+      ]
+    },
+    "normalized_difference": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "math > indices",
+        "vegetation indices"
+      ]
+    },
+    "not": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "logic"
+      ]
+    },
+    "or": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "logic"
+      ]
+    },
+    "order": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "sorting"
+      ]
+    },
+    "pi": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > constants",
+        "math > trigonometric"
+      ]
+    },
+    "power": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math",
+        "math > exponential & logarithmic"
+      ]
+    },
+    "product": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math",
+        "reducer"
+      ]
+    },
+    "aggregate_spatial_window": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "aggregate"
+      ]
+    },
+    "apply_polygon": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "ard_normalized_radar_backscatter": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "sar",
+        "ard"
+      ]
+    },
+    "ard_surface_reflectance": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "optical",
+        "ard"
+      ]
+    },
+    "array_create_labeled": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "arrays"
+      ]
+    },
+    "array_find_label": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "arrays",
+        "reducer"
+      ]
+    },
+    "array_modify": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "arrays"
+      ]
+    },
+    "atmospheric_correction": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "optical"
+      ]
+    },
+    "cloud_detection": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "optical"
+      ]
+    },
+    "cummax": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "math > cumulative"
+      ]
+    },
+    "cummin": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "math > cumulative"
+      ]
+    },
+    "cumproduct": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "math > cumulative"
+      ]
+    },
+    "cumsum": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "math > cumulative"
+      ]
+    },
+    "date_between": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "comparison",
+        "date & time"
+      ]
+    },
+    "date_difference": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "comparison",
+        "date & time"
+      ]
+    },
+    "date_shift": {
+      "level": "L3",
+      "experimental": true,
+      "categories": [
+        "date & time"
+      ]
+    },
+    "filter_labels": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "filter"
+      ]
+    },
+    "filter_vector": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "filter",
+        "vector"
+      ]
+    },
+    "fit_curve": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "arrays",
+        "math"
+      ]
+    },
+    "flatten_dimensions": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "inspect": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "development"
+      ]
+    },
+    "is_infinite": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "comparison"
+      ]
+    },
+    "load_geojson": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "import",
+        "vector"
+      ]
+    },
+    "load_stac": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "import"
+      ]
+    },
+    "load_uploaded_files": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "import"
+      ]
+    },
+    "load_url": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "import"
+      ]
+    },
+    "nan": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "math > constants"
+      ]
+    },
+    "predict_curve": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "math"
+      ]
+    },
+    "reduce_spatial": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "aggregate",
+        "cubes",
+        "reducer"
+      ]
+    },
+    "run_udf_externally": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "import",
+        "udf"
+      ]
+    },
+    "sar_backscatter": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "sar"
+      ]
+    },
+    "unflatten_dimension": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "vector_buffer": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "vector"
+      ]
+    },
+    "vector_reproject": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "reproject",
+        "vector"
+      ]
+    },
+    "vector_to_random_points": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "vector"
+      ]
+    },
+    "vector_to_regular_points": {
+      "level": "L4",
+      "experimental": true,
+      "categories": [
+        "cubes",
+        "vector"
+      ]
+    },
+    "quantiles": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > statistics"
+      ]
+    },
+    "rearrange": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "sorting"
+      ]
+    },
+    "reduce_dimension": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "reducer"
+      ]
+    },
+    "rename_dimension": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "rename_labels": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "resample_cube_spatial": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "reproject"
+      ]
+    },
+    "resample_cube_temporal": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "reproject"
+      ]
+    },
+    "resample_spatial": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "reproject"
+      ]
+    },
+    "round": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > rounding"
+      ]
+    },
+    "run_udf": {
+      "level": "L4",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "import",
+        "udf"
+      ]
+    },
+    "save_result": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "cubes",
+        "export"
+      ]
+    },
+    "sd": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > statistics",
+        "reducer"
+      ]
+    },
+    "sgn": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "sin": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "sinh": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "sort": {
+      "level": "L2",
+      "experimental": false,
+      "categories": [
+        "arrays",
+        "sorting"
+      ]
+    },
+    "sqrt": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math",
+        "math > exponential & logarithmic"
+      ]
+    },
+    "subtract": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math"
+      ]
+    },
+    "sum": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math",
+        "reducer"
+      ]
+    },
+    "tan": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "tanh": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "math > trigonometric"
+      ]
+    },
+    "text_begins": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "texts",
+        "comparison"
+      ]
+    },
+    "text_concat": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "texts"
+      ]
+    },
+    "text_contains": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "texts",
+        "comparison"
+      ]
+    },
+    "text_ends": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "texts",
+        "comparison"
+      ]
+    },
+    "trim_cube": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "cubes"
+      ]
+    },
+    "variance": {
+      "level": "L1",
+      "experimental": false,
+      "categories": [
+        "math > statistics",
+        "reducer"
+      ]
+    },
+    "xor": {
+      "level": "L3",
+      "experimental": false,
+      "categories": [
+        "logic"
+      ]
+    }
+  }
+}

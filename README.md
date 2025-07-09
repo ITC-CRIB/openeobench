@@ -121,29 +121,38 @@ python openeobench run-summary -i output/folder1 output/folder2 -o timing_summar
 
 **Output columns:** `filename`, `time_submit`, `time_submit_stddev`, `time_job_execution`, `time_job_execution_stddev`, `time_download`, `time_download_stddev`, `time_processing`, `time_processing_stddev`, `time_queue`, `time_queue_stddev`, `time_total`, `time_total_stddev`
 
-### Process Summary (Coming soon)
-
-Generate compliance reports for process implementations:
-
-```bash
-python openeobench process-summary <input,...> --output <out> --format <format>
-```
-
-**Output**: 
-- CSV columns: `backend`, `l1_available`, `l1_missing`, `l1_mismatch`, `l2_available`, `...`, `total_mismatch`
-- Markdown document with compliance analysis across backends
-
-### Process Analysis (Coming Soon)
+### Process Compliance Checking
 
 Check OpenEO process availability and compliance:
 
 ```bash
-python openeobench process --url <api_url> --output <out>
+# Check single backend
+python openeobench process --backend "VITO" --api-url https://openeo.vito.be/openeo/1.1 -o process_results
+
+# Check multiple backends from CSV
+python openeobench process -i backends.csv -o process_compliance
 ```
 
 **Output**: 
-- CSV file with columns: `process`, `level`, `status`, `compatibility`, `reason`
-- OpenEO API compliant JSON file with detailed process information
+- CSV file (`.csv`) with columns: `process`, `level`, `status`, `compatibility`, `reason`
+- JSON file (`.json`) containing the raw `/processes` endpoint response
+- Process compliance analysis against OpenEO profiles (L1-L4)
+
+### Process Summary
+
+Generate compliance reports for process implementations:
+
+```bash
+# CSV output
+python openeobench process-summary -i process_results/ -o process_summary.csv
+
+# Markdown report
+python openeobench process-summary -i process_results/ -o process_summary.md
+```
+
+**Output**: 
+- CSV columns: `backend`, `l1_available`, `l1_compliance_rate`, `l2_available`, `l2_compliance_rate`, etc.
+- Markdown document with compliance analysis across backends
 
 
 
@@ -157,19 +166,27 @@ python openeobench process --url <api_url> --output <out>
 | `service-summary` | Performance reports | `-i` (results folder/CSV), `-o` (CSV/MD output) |
 | `run` | Execute OpenEO scenarios | `--api-url` (backend), `-i` (scenario JSON), `-o` (output dir) |
 | `run-summary` | Timing statistics from runs | `-i` (result folders/files), `-o` (CSV output) |
+| `process` | Check process availability/compliance | `--backend` + `--api-url` or `-i` (CSV), `-o` (output file) | requests |
+| `process-summary` | Generate compliance reports | `-i` (results folder/file), `-o` (CSV/MD output) | - |
 
-### Coming Soon Commands
+## OpenEO Process Profiles
 
-| Command | Description | Key Options | Output Format |
-|---------|-------------|-------------|---------------|
-| `process` | Check process availability/compliance | `--url` (API URL), `--output` (directory) | CSV + JSON |
-| `process-summary` | Generate compliance reports | `<input,...>` (inputs), `--output`, `--format` | CSV/Markdown |
+The process compliance checking is based on the official OpenEO API specification process profiles:
+
+- **L1 (Basic)**: Essential processes for basic data access and output
+  - `load_collection`, `save_result`, `filter_bbox`, `filter_temporal`, `reduce_dimension`, `apply`, `linear_scale_range`
+- **L2 (EO Data Manipulation)**: Earth observation specific data processing
+  - `ndvi`, `evi`, `aggregate_temporal`, `resample_spatial`, `merge_cubes`, `apply_dimension`, `array_element`, `clip`, `mask`, `filter_bands`
+- **L3 (Mathematical Operations)**: Mathematical and statistical functions
+  - `add`, `subtract`, `multiply`, `divide`, `absolute`, `sqrt`, `power`, `exp`, `ln`, `log`, `sin`, `cos`, `tan`, `arcsin`, `arccos`, `arctan`, `min`, `max`, `mean`, `median`, `sum`, `product`, `count`, `sd`, `variance`
+- **L4 (Advanced Analysis)**: Advanced algorithms and machine learning
+  - `fit_curve`, `predict_curve`, `ml_fit`, `ml_predict`, `sar_backscatter`, `atmospheric_correction`, `cloud_detection`, `create_data_cube`
 
 ## Output Formats
 
 ### Service Check Results
 - **Location**: `outputs/YYYY-MM-DD.csv` or `outputs/YYYY-MM-DD_single.csv`
-- **Columns**: URL, Timestamp, Response Time (ms), HTTP Code, Errors, Body Size (bytes)
+- **Columns**: url, timestamp, response_time, status_code, error_msg, content_size
 
 ### Run Results  
 - **Location**: Organized in timestamped folders with `results.json`

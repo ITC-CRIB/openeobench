@@ -49,7 +49,7 @@ def calculate_statistics(output_folder, start_date, end_date, output_file):
                 
                 for row in reader:
                     backend = row['Backends']
-                    url = row['URL']
+                    url = row['url']
                     valid = row['Valid']
                     
                     # Count total and successful requests
@@ -59,15 +59,15 @@ def calculate_statistics(output_folder, start_date, end_date, output_file):
                     
                     # Collect response times for valid responses
                     try:
-                        response_time = float(row['Response Time (ms)'])
-                        body_size = int(row['Body Size (bytes)'])
+                        response_time = float(row['response_time'])
+                        body_size = int(row['content_size'])
                         
                         if valid.lower() == 'true' and response_time is not None:
                             response_times[backend][url].append(response_time)
                             
-                            # Calculate normalized response time (ms/Kbyte)
+                            # Calculate normalized response time (ms/byte)
                             if body_size > 0:  # Avoid division by zero
-                                norm_time = response_time / (body_size / 1024)
+                                norm_time = response_time / body_size
                                 normalized_times[backend][url].append(norm_time)
                     except (ValueError, TypeError):
                         # Skip if response time or body size is not a valid number
@@ -106,8 +106,8 @@ def calculate_statistics(output_folder, start_date, end_date, output_file):
                 'Success Ratio (%)': f"{success_ratio:.2f}",
                 'Average Response Time (ms)': f"{avg_time:.2f}" if isinstance(avg_time, float) else avg_time,
                 'Response Time StdDev (ms)': f"{std_dev:.2f}" if isinstance(std_dev, float) else std_dev,
-                'Normalized Response Time (ms/Kbyte)': f"{avg_norm:.6f}" if isinstance(avg_norm, float) else avg_norm,
-                'Normalized Time StdDev (ms/Kbyte)': f"{norm_std_dev:.6f}" if isinstance(norm_std_dev, float) else norm_std_dev
+                'Normalized Response Time (ms/byte)': f"{avg_norm:.6f}" if isinstance(avg_norm, float) else avg_norm,
+                'Normalized Time StdDev (ms/byte)': f"{norm_std_dev:.6f}" if isinstance(norm_std_dev, float) else norm_std_dev
             })
     
     # Print statistics to console
@@ -118,15 +118,15 @@ def calculate_statistics(output_folder, start_date, end_date, output_file):
         print("Success Ratio: " + row['Success Ratio (%)'])
         print("Average Response Time: " + row['Average Response Time (ms)'])
         print("Response Time StdDev: " + row['Response Time StdDev (ms)'])
-        print("Normalized Response Time: " + row['Normalized Response Time (ms/Kbyte)'])
-        print("Normalized Time StdDev: " + row['Normalized Time StdDev (ms/Kbyte)'])
+        print("Normalized Response Time: " + row['Normalized Response Time (ms/byte)'])
+        print("Normalized Time StdDev: " + row['Normalized Time StdDev (ms/byte)'])
 
     print()
     # Write to CSV file
     if csv_data:
         with open(output_file, 'w', newline='') as csvfile:
-            fieldnames = ['Backend', 'URL', 'Success Ratio (%)', 'Average Response Time (ms)', 'Response Time StdDev (ms)', 
-                         'Normalized Response Time (ms/Kbyte)', 'Normalized Time StdDev (ms/Kbyte)']
+            fieldnames = ['URL', 'Success Ratio (%)', 'Average Response Time (ms)', 'Response Time StdDev (ms)', 
+                         'Normalized Response Time (ms/byte)', 'Normalized Time StdDev (ms/byte)']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(csv_data)
