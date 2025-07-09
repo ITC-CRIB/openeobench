@@ -365,12 +365,24 @@ def calculate_statistics_flexible(input_paths, output_file, start_date=None, end
     return calculate_statistics_from_files(input_paths[0] if input_paths else output_file, start_date, end_date, output_file)
 
 def run_openeo_scenario(api_url, input_path, output_directory=None):
+   def run_openeo_scenario(api_url, input_path, output_directory=None):
     """
-    Placeholder function for running OpenEO scenarios.
-    This functionality is not yet implemented in this version.
+    Wrapper function to run OpenEO scenarios using openeotest functionality.
+    This function imports and calls the run_task from openeotest.py
     """
-    print(f"run_openeo_scenario not yet implemented: {api_url}, {input_path}, {output_directory}")
-    return False
+    try:
+        # Import the run_task function from openeotest
+        from openeotest import run_task
+        
+        # Call the run_task function
+        return run_task(api_url, input_path, output_directory)
+    except ImportError as e:
+        print(f"Error: Unable to import openeotest module: {e}")
+        print("Make sure openeotest.py is available in the current directory.")
+        return None
+    except Exception as e:
+        print(f"Error running scenario: {e}")
+        return None
 
 def run_summary_task(input_paths, output_file, output_format='csv'):
     """
