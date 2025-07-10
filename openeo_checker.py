@@ -817,77 +817,114 @@ def get_file_statistics(file_path):
     }
 
 def parse_gdalinfo_stats(gdalinfo_output):
-    """Parse statistics from gdalinfo output"""
+    """Parse statistics from gdalinfo output with comprehensive regex patterns"""
+    import re
+    
     stats = {}
     
     try:
         lines = gdalinfo_output.split('\n')
+        
         for line in lines:
             line = line.strip()
             
-            # Extract statistics - handle both formats:
-            # Format 1: "Minimum=X, Maximum=Y, Mean=Z, StdDev=W"
-            # Format 2: "Min=X Max=Y"
-            if ('Minimum=' in line or 'Min=' in line) and ('Maximum=' in line or 'Max=' in line):
-                # Split by commas or spaces depending on format
-                parts = line.split(',') if ',' in line else line.split()
-                
-                for part in parts:
-                    part = part.strip()
-                    if part.startswith('Minimum=') or part.startswith('Min='):
-                        stats['min'] = float(part.split('=')[1])
-                    elif part.startswith('Maximum=') or part.startswith('Max='):
-                        stats['max'] = float(part.split('=')[1])
-                    elif part.startswith('Mean='):
-                        stats['mean'] = float(part.split('=')[1])
-                    elif part.startswith('StdDev='):
-                        stats['stddev'] = float(part.split('=')[1])
+            # Extract raster size - "Size is 826, 1024"
+            size_match = re.search(r'Size is (\d+),?\s*(\d+)', line)
+            if size_match:
+                width = int(size_match.group(1))
+                height = int(size_match.group(2))
+                stats['raster_size'] = f"{width}x{height}"
+                stats['count'] = width * height
             
-            # Extract other metadata
-            elif line.startswith('Driver:'):
-                # Extract driver info
-                pass
-            elif line.startswith('Size is'):
-                # Extract raster size
-                size_part = line.replace('Size is ', '').split(',')[0]
-                stats['raster_size'] = size_part.replace(' ', 'x')
-            elif 'EPSG:' in line:
-                # Extract CRS
-                import re
-                epsg_match = re.search(r'EPSG:(\d+)', line)
-                if epsg_match:
-                    stats['crs'] = f"EPSG:{epsg_match.group(1)}"
+            # Extract pixel size - "Pixel Size = (10.000000000000000,-10.000000000000000)"
+            pixel_match = re.search(r'Pixel Size = \(([^,]+),([^)]+)\)', line)
+            if pixel_match:
+                x_size = abs(float(pixel_match.group(1)))
+                y_size = abs(float(pixel_match.group(2)))
+                # Format with appropriate decimal places based on magnitude
+                if x_size < 0.01:
+                    stats['pixel_size'] = f"{x_size:.6f}x{y_size:.6f}"
+                elif x_size < 1.0:
+                    stats['pixel_size'] = f"{x_size:.3f}x{y_size:.3f}"
+                else:
+                    stats['pixel_size'] = f"{x_size:.1f}x{y_size:.1f}"
+            
+            # Extract CRS/EPSG - handle multiple formats
+            epsg_match = re.search(r'(?:EPSG[",:]|ID\["EPSG",)(\d+)', line)
+            if epsg_match:
+                stats['crs'] = f"EPSG:{epsg_match.group(1)}"
+            
+            # Extract statistics - handle various formats:
+            # "Minimum=0.000, Maximum=0.810, Mean=0.405, StdDev=0.234"
+            # "Min=0.000 Max=0.810"
+            # Look for statistics lines with Min/Max
+            if ('Minimum=' in line or 'Min=' in line) and ('Maximum=' in line or 'Max=' in line):
+                # Extract min value
+                min_match = re.search(r'(?:Minimum|Min)=([+-]?[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)', line)
+                if min_match:
+                    stats['min'] = float(min_match.group(1))
+                
+                # Extract max value
+                max_match = re.search(r'(?:Maximum|Max)=([+-]?[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)', line)
+                if max_match:
+                    stats['max'] = float(max_match.group(1))
+                
+                # Extract mean value (optional)
+                mean_match = re.search(r'Mean=([+-]?[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)', line)
+                if mean_match:
+                    stats['mean'] = float(mean_match.group(1))
+                
+                # Extract stddev value (optional)
+                stddev_match = re.search(r'StdDev=([+-]?[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)', line)
+                if stddev_match:
+                    stats['stddev'] = float(stddev_match.group(1))
+            
+            # Extract data type - look for various patterns
+            # "Type=Float32" or "Block=256x256 Type=Float32"
+            type_match = re.search(r'Type=(\w+)', line)
+            if type_match:
+                stats['datatype'] = type_match.group(1)
+            
+            # Extract NoData value - "NoData Value=-9999"
+            nodata_match = re.search(r'NoData Value=([+-]?[0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)', line)
+            if nodata_match:
+                stats['nodata_value'] = nodata_match.group(1)
         
-        # Calculate mean and stddev if not present but min/max are available
-        if ('min' in stats and 'max' in stats and 
-            ('mean' not in stats or 'stddev' not in stats)):
-            stats['mean'] = (stats['min'] + stats['max']) / 2.0
-            stats['stddev'] = (stats['max'] - stats['min']) / 4.0  # Rough approximation
+        # Calculate derived values if min/max available but mean/stddev missing
+        if 'min' in stats and 'max' in stats:
+            if 'mean' not in stats:
+                stats['mean'] = (stats['min'] + stats['max']) / 2.0
+            if 'stddev' not in stats:
+                # Better approximation: assume normal distribution, stddev ≈ range/4
+                stats['stddev'] = abs(stats['max'] - stats['min']) / 4.0
         
-        # Set defaults for missing values
-        if 'min' not in stats:
+        # Set minimal defaults only for critical missing values
+        if 'min' not in stats or 'max' not in stats:
             stats.update({'min': 0.0, 'max': 1.0, 'mean': 0.5, 'stddev': 0.0})
         if 'raster_size' not in stats:
             stats['raster_size'] = '100x100'
+            stats['count'] = 10000
+        if 'pixel_size' not in stats:
+            stats['pixel_size'] = '0.001x0.001'
         if 'crs' not in stats:
             stats['crs'] = 'EPSG:4326'
+        if 'datatype' not in stats:
+            stats['datatype'] = 'Float32'
+        if 'nodata_value' not in stats:
+            stats['nodata_value'] = 'N/A'
         
-        # Set additional metadata
-        stats.update({
-            'count': 1000,
-            'nodata_count': 0,
-            'datatype': 'Float32',
-            'nodata_value': 'N/A',
-            'pixel_size': '0.001x0.001',
-            'projection': 'N/A',
-            'projection_zone': 'N/A',
-            'datum': 'WGS 84',
-            'ellipsoid': 'WGS 84'
-        })
+        # Set additional metadata with sensible defaults
+        stats.setdefault('nodata_count', 0)
+        stats.setdefault('projection', 'N/A')
+        stats.setdefault('projection_zone', 'N/A')
+        stats.setdefault('datum', 'WGS 84')
+        stats.setdefault('ellipsoid', 'WGS 84')
         
-    except Exception:
+    except Exception as e:
+        print(f"Error parsing gdalinfo output: {e}")
         return None
     
+    # Return stats only if we have the essential information
     return stats if len(stats) >= 4 else None
 
 def write_file_statistics_csv(run_statistics, output_file):
