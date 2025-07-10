@@ -43,11 +43,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Check endpoints from CSV file
+  # Check endpoints from CSV file (creates new timestamped file)
   openeobench service -i endpoints.csv -o results/
   
-  # Check a single URL
+  # Check endpoints and append to daily file
+  openeobench service -i endpoints.csv -o results/ --append
+  
+  # Check a single URL (creates new timestamped file)
   openeobench service -u https://openeo.example.com/.well-known/openeo -o results/
+  
+  # Check a single URL and append to daily file
+  openeobench service -u https://openeo.example.com/.well-known/openeo -o results/ --append
   
   # Run OpenEO scenario on a backend
   openeobench run --api-url https://openeo.example.com -i scenario.json -o results/
@@ -100,6 +106,11 @@ Examples:
         "-n",
         "--name",
         help="Backend name for single URL (optional, defaults to hostname)",
+    )
+    service_parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Append to existing daily CSV file (default: create new file for each run)",
     )
 
     # Run command (equivalent to openeotest run, but with renamed --scenario to --input)
@@ -215,17 +226,29 @@ Examples:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        # Get date in YYYY-MM-DD format
+        # Generate output filename based on append flag
         date = datetime.datetime.now().strftime("%Y-%m-%d")
+        
+        if args.append:
+            # Use daily filename for appending (existing behavior)
+            if args.url:
+                output_csv = os.path.join(output_dir, f"{date}_single.csv")
+            else:
+                output_csv = os.path.join(output_dir, f"{date}.csv")
+        else:
+            # Create unique filename for each run
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            if args.url:
+                output_csv = os.path.join(output_dir, f"{timestamp}_single.csv")
+            else:
+                output_csv = os.path.join(output_dir, f"{timestamp}.csv")
 
         if args.url:
             # Single URL mode
-            output_csv = os.path.join(output_dir, f"{date}_single.csv")
-            process_single_url(args.url, args.name, output_csv)
+            process_single_url(args.url, args.name, output_csv, force_new=not args.append)
         else:
             # CSV file mode
-            output_csv = os.path.join(output_dir, f"{date}.csv")
-            process_csv(args.input, output_csv)
+            process_csv(args.input, output_csv, force_new=not args.append)
 
     elif args.command == "run":
         # Run OpenEO scenario

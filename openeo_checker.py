@@ -53,16 +53,22 @@ def check_url(url):
     except requests.exceptions.RequestException as e:
         return None, "Request exception", str(e), False, 0
 
-def process_single_url(url, backend_name, output_file):
+def process_single_url(url, backend_name, output_file, force_new=False):
     """
-    Process a single URL and append result to the output CSV file.
+    Process a single URL and write result to the output CSV file.
+    
+    Args:
+        url: The URL to check
+        backend_name: Name for the backend (optional)
+        output_file: Path to output CSV file
+        force_new: If True, always create a new file. If False, append to existing file.
     """
     results = []
     testing_time = datetime.datetime.now().timestamp()
     
     try:
-        # Check if output file exists and create it with headers if it doesn't
-        file_exists = os.path.exists(output_file)
+        # Check if output file exists and determine if we should create new or append
+        file_exists = os.path.exists(output_file) and not force_new
         
         # If no backend name provided, use hostname
         if not backend_name:
@@ -111,7 +117,8 @@ def process_single_url(url, backend_name, output_file):
             for result in results:
                 writer.writerow(result)
                 
-        print(f"Results appended to {output_file}")
+        action = "appended to" if file_exists else "saved to"
+        print(f"Results {action} {output_file}")
         
         # Print immediate results to console
         print("\nResults:")
@@ -129,12 +136,16 @@ def process_single_url(url, backend_name, output_file):
         print(f"Error: {str(e)}")
         sys.exit(1)
 
-def process_csv(input_file, output_file):
+def process_csv(input_file, output_file, force_new=False):
     """
-    Process the input CSV file and append results to the output CSV file.
+    Process the input CSV file and write results to the output CSV file.
     Treats URLs in the input as base URLs and appends predefined endpoints to each.
     Records HTTP response reasoning alongside the status code.
-    Maintains a history of all test runs by appending new results to the output file.
+    
+    Args:
+        input_file: Path to input CSV file with URLs
+        output_file: Path to output CSV file
+        force_new: If True, always create a new file. If False, append to existing file.
     """
     
     results = []
@@ -142,30 +153,42 @@ def process_csv(input_file, output_file):
     testing_time = datetime.datetime.now().timestamp()
     
     try:
-        # Check if output file exists and create it with headers if it doesn't
-        file_exists = os.path.exists(output_file)
+        # Check if output file exists and determine if we should create new or append
+        file_exists = os.path.exists(output_file) and not force_new
         
         # Read input file and process URLs
         with open(input_file, 'r') as infile:
             reader = csv.DictReader(infile)
             
-            # Check if required columns exist
-            if 'URL' not in reader.fieldnames:
-                print("Error: Input CSV must contain 'URL' column")
+            # Check if required columns exist (case-insensitive)
+            url_column = None
+            for col in reader.fieldnames:
+                if col.lower() == 'url':
+                    url_column = col
+                    break
+            
+            if url_column is None:
+                print("Error: Input CSV must contain 'URL' or 'url' column")
                 sys.exit(1)
             
             # Process each URL and store results in memory
             try:
                 for row in reader:
-                    # Use Backends column if it exists, otherwise use hostname
-                    if 'Backends' in reader.fieldnames and row['Backends'].strip():
-                        name = row['Backends'].strip()
+                    # Use name/Backends column if it exists, otherwise use hostname
+                    backend_column = None
+                    for col in ['name', 'Backends', 'backends', 'Name']:
+                        if col in reader.fieldnames and row[col].strip():
+                            backend_column = col
+                            break
+                    
+                    if backend_column:
+                        name = row[backend_column].strip()
                     else:
                         # Extract hostname from URL
-                        parsed_url = urlparse(row['URL'].strip())
+                        parsed_url = urlparse(row[url_column].strip())
                         name = parsed_url.netloc if parsed_url.netloc else "unknown"
                     
-                    base_url = row['URL'].strip().rstrip('/')  # Remove trailing slash if present
+                    base_url = row[url_column].strip().rstrip('/')  # Remove trailing slash if present
                     
                     # Validate base URL
                     parsed_url = urlparse(base_url)
@@ -213,7 +236,8 @@ def process_csv(input_file, output_file):
             for result in results:
                 writer.writerow(result)
                 
-        print(f"Results appended to {output_file}")
+        action = "appended to" if file_exists else "saved to"
+        print(f"Results {action} {output_file}")
         
     except FileNotFoundError:
         print(f"Error: Could not find input file {input_file}")
