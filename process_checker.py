@@ -625,7 +625,7 @@ def write_results_to_csv(results: List[Dict], output_file: str):
             
             writer.writerow(row)
 
-def load_official_process_specs(spec_file: str = "openeo_processes_1.0.json") -> Dict[str, Dict]:
+def load_official_process_specs(spec_file: str = "combined_processes.json") -> Dict[str, Dict]:
     """
     Load the official OpenEO 1.0 process specifications.
     
