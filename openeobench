@@ -14,6 +14,9 @@ from openeo_checker import (
     run_summary_task,  # Used in run-summary command
 )
 
+# Import visualize functionality from openeotest
+from openeotest import visualize_task
+
 # Import process checking functions
 from process_checker import (
     check_backend_processes,
@@ -87,6 +90,21 @@ Examples:
   
   # Generate process compliance summary (Markdown)  
   openeobench process-summary process_results/ --output process_summary.md --format md
+  
+  # Create visual matrix of GeoTIFF results with format options
+  openeobench visualize output/folder1 output/folder2 --output visualization.md --format both
+  
+  # Create only PNG matrix
+  openeobench visualize output/folder1 output/folder2 --output visualization.png --format png
+  
+  # Create only markdown report
+  openeobench visualize output/folder1 output/folder2 --output visualization.md --format md
+  
+  # Visualize individual TIFF files
+  openeobench visualize path/to/file1.tif path/to/file2.tif --output comparison.md --format both
+  
+  # Mix folders and individual files
+  openeobench visualize output/folder1 path/to/specific_file.tif --output mixed_visualization.md
         """,
     )
 
@@ -214,6 +232,27 @@ Examples:
         "--format", choices=["csv", "md"], help="Output format (csv or md)"
     )
 
+    # Visualize command - create visual matrix of GeoTIFF results
+    visualize_parser = subparsers.add_parser(
+        "visualize", help="Create visual matrix and statistics of GeoTIFF results"
+    )
+    visualize_parser.add_argument(
+        "input", nargs="+", help="Input folders, files, or patterns to visualize (supports .tif/.tiff files)"
+    )
+    visualize_parser.add_argument(
+        "--output", required=True, help="Output file path"
+    )
+    visualize_parser.add_argument(
+        "--format", 
+        choices=["md", "png", "both"], 
+        default="md",
+        help="Output format: md (markdown), png (PNG matrix), or both (default: both)"
+    )
+    visualize_parser.add_argument(
+        "--png-single", action="store_true", 
+        help="Create individual PNG files for each image"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -331,6 +370,21 @@ Examples:
             write_csv_summary(summary, args.output)
 
         print(f"Process summary saved to: {args.output}")
+
+    elif args.command == "visualize":
+        # Visualize GeoTIFF results with matrix layout and statistics
+        
+        # Validate input paths exist
+        for input_path in args.input:
+            if not os.path.exists(input_path) and not any(os.path.exists(match) for match in [input_path, f"output/*{input_path}*"]):
+                print(f"Warning: Input path '{input_path}' may not exist - will attempt pattern matching")
+
+        try:
+            visualize_task(args.input, args.output, output_format=args.format, png_single=args.png_single)
+            print(f"Visualization saved to: {args.output}")
+        except (FileNotFoundError, OSError, ValueError) as e:
+            print(f"Error during visualization: {e}")
+            return 1
 
     return 0
 

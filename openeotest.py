@@ -29,14 +29,16 @@ from collections import defaultdict
 # Try to import optional visualization dependencies
 try:
     import numpy as np  # Required for array operations
-    # For enhanced geotiff loading
-    try:
-        import rioxarray as rxr
-        import xarray as xr  # For netCDF and advanced array operations
-        RIOXARRAY_AVAILABLE = True
-    except ImportError:
-        RIOXARRAY_AVAILABLE = False
-        print("Warning: rioxarray not available, advanced image loading features will be limited")
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+    print("Warning: numpy not available, some visualization features will be limited")
+
+# For enhanced geotiff loading
+try:
+    import rioxarray as rxr
+    import xarray as xr  # For netCDF and advanced array operations
+    RIOXARRAY_AVAILABLE = True
 except ImportError:
     RIOXARRAY_AVAILABLE = False
     print("Warning: rioxarray not available, advanced image loading features will be limited")
@@ -889,7 +891,7 @@ def visualize_task(args):
     logging.info(f"Statistics saved to {stats_path}")
     
     return 0
-def visualize_task(input_patterns, output_path):
+def visualize_task(input_patterns, output_path, output_format="both", png_single=False):
     """
     Create a visual matrix of resulting GeoTIFF images and summary statistics.
     Enhanced with robust error handling, multiple fallback methods, and publication-quality visualization.
@@ -898,7 +900,9 @@ def visualize_task(input_patterns, output_path):
     
     Args:
         input_patterns: List of glob patterns matching folders to visualize
-        output_path: Path to save visualization results (.md file)
+        output_path: Path to save visualization results
+        output_format: Output format - "md" (markdown), "png" (PNG matrix), or "both" (default)
+        png_single: Whether to create individual PNG files for each image
     """
     logger.info(f"Visualizing results for patterns: {input_patterns}, output: {output_path}")
     
@@ -940,10 +944,11 @@ def visualize_task(input_patterns, output_path):
     else:
         logger.error("No visualization methods available! Will attempt to continue with minimal functionality.")
     
-    # Expand glob patterns to folder list - always prioritize output directory
+    # Expand patterns to folders and individual files
     matched_folders = set()
+    matched_individual_files = {}  # folder_path -> [file_paths]
     
-    # First, ensure we're always looking in the output directory
+    # First, ensure we're always looking in the output directory for folders
     for pattern in input_patterns:
         # Try specific output directory pattern
         output_pattern = os.path.join("output", f"*{pattern}*")
@@ -953,26 +958,44 @@ def visualize_task(input_patterns, output_path):
             if os.path.isdir(folder):
                 matched_folders.add(folder)
     
-    # If no matches found in output directory with wildcards, try exact pattern
-    if not matched_folders:
+    # If no matches found in output directory with wildcards, try exact patterns
+    if not matched_folders and not matched_individual_files:
         for pattern in input_patterns:
-            # Try exact pattern in output directory
+            # Try exact pattern in output directory (folder)
             output_pattern = os.path.join("output", pattern)
             if os.path.isdir(output_pattern):
                 matched_folders.add(output_pattern)
             
-            # Also check direct pattern as fallback
+            # Check direct pattern as fallback
             if os.path.isdir(pattern):
                 matched_folders.add(pattern)
+            elif os.path.isfile(pattern):
+                # Handle individual files
+                if pattern.lower().endswith(('.tif', '.tiff')):
+                    parent_dir = os.path.dirname(pattern) or "."
+                    if parent_dir not in matched_individual_files:
+                        matched_individual_files[parent_dir] = []
+                    matched_individual_files[parent_dir].append(pattern)
+                    logger.info(f"Found individual TIFF file: {pattern}")
+                else:
+                    logger.warning(f"Skipping non-TIFF file: {pattern}")
             elif glob.glob(pattern):
-                # Add any glob matches
+                # Handle glob patterns that might match files or directories
                 for match in glob.glob(pattern):
                     if os.path.isdir(match):
                         matched_folders.add(match)
+                    elif os.path.isfile(match) and match.lower().endswith(('.tif', '.tiff')):
+                        parent_dir = os.path.dirname(match) or "."
+                        if parent_dir not in matched_individual_files:
+                            matched_individual_files[parent_dir] = []
+                        matched_individual_files[parent_dir].append(match)
+                        logger.info(f"Found individual TIFF file from glob: {match}")
     
     # Sort for consistent output
     matched_folders = sorted(matched_folders)
-    logger.info(f"Matched {len(matched_folders)} folders.")
+    total_individual_files = sum(len(files) for files in matched_individual_files.values())
+    
+    logger.info(f"Matched {len(matched_folders)} folders and {total_individual_files} individual files.")
     
     if matched_folders:
         # Print first few matches for confirmation
@@ -980,7 +1003,16 @@ def visualize_task(input_patterns, output_path):
         if len(matched_folders) > 5:
             preview += f", ... ({len(matched_folders) - 5} more)"
         logger.info(f"Found folders: {preview}")
-    else:
+    
+    if matched_individual_files:
+        file_preview = []
+        for parent_dir, files in list(matched_individual_files.items())[:3]:
+            file_preview.extend([os.path.basename(f) for f in files[:2]])
+        if total_individual_files > len(file_preview):
+            file_preview.append(f"... ({total_individual_files - len(file_preview)} more)")
+        logger.info(f"Found individual files: {', '.join(file_preview)}")
+    
+    if not matched_folders and not matched_individual_files:
         logger.error("No folders matched the input pattern(s). Please check the pattern and make sure the output directory exists.")
         # List some folders in output dir for troubleshooting
         try:
@@ -997,9 +1029,14 @@ def visualize_task(input_patterns, output_path):
             logger.error(f"Error listing output directory: {e}")
         return
     
-    # Validate output path
-    if not output_path.endswith('.md'):
-        logger.error("Output file must have .md extension")
+    # Determine what outputs to create based on format parameter
+    create_markdown = output_format in ["md", "both"]
+    create_png = output_format in ["png", "both"]
+    
+    # Validate output path format
+    valid_extensions = ['.md', '.png', '.csv']
+    if not any(output_path.endswith(ext) for ext in valid_extensions):
+        logger.error(f"Output file must have one of these extensions: {', '.join(valid_extensions)}")
         return
     
     # Create output directories
@@ -1007,9 +1044,12 @@ def visualize_task(input_patterns, output_path):
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
     
-    # Directory for storing visualizations
-    vis_dir = os.path.join(output_dir, 'visualizations')
-    os.makedirs(vis_dir, exist_ok=True)
+    # Directory for storing visualizations (only needed for markdown)
+    if create_markdown:
+        vis_dir = os.path.join(output_dir, 'visualizations')
+        os.makedirs(vis_dir, exist_ok=True)
+    else:
+        vis_dir = None
     
     # Dictionary to store all TIFF files by folder
     folder_images = {}
@@ -1042,6 +1082,24 @@ def visualize_task(input_patterns, output_path):
         else:
             logger.warning(f"No GeoTIFF files found in {folder_name}")
     
+    # Handle individual files grouped by their parent directories
+    for parent_dir, file_paths in matched_individual_files.items():
+        # Create a unique folder name for individual files
+        if parent_dir == ".":
+            folder_name = "current_directory"
+        else:
+            folder_name = os.path.basename(parent_dir) + "_individual_files"
+        
+        # Make sure folder name is unique
+        original_folder_name = folder_name
+        counter = 1
+        while folder_name in folder_images:
+            folder_name = f"{original_folder_name}_{counter}"
+            counter += 1
+        
+        folder_images[folder_name] = file_paths
+        logger.info(f"Added {len(file_paths)} individual TIFF file(s) as folder '{folder_name}'")
+    
     # Create a matrix of all filenames for the MD report
     all_filenames = set()
     for files in folder_images.values():
@@ -1068,8 +1126,10 @@ def visualize_task(input_patterns, output_path):
             
             # Create visualization - use new robust creation method
             try:
-                thumb_path = os.path.join(vis_dir, f"{folder_name}_{png_filename}.png")
-                _create_geotiff_thumbnail(tiff_path, thumb_path)
+                # Only create thumbnails for markdown output
+                if create_markdown and vis_dir:
+                    thumb_path = os.path.join(vis_dir, f"{folder_name}_{png_filename}.png")
+                    _create_geotiff_thumbnail(tiff_path, thumb_path)
                 
                 # Get statistics with enhanced robustness
                 stats = _get_geotiff_statistics(tiff_path)
@@ -1083,13 +1143,14 @@ def visualize_task(input_patterns, output_path):
                 errors.append(f"Error processing {tiff_path}: {error_msg}")
                 logger.error(f"Error processing {tiff_path}: {error_msg}")
                 
-                # Create a placeholder image for failures
-                try:
-                    thumb_path = os.path.join(vis_dir, f"{folder_name}_{png_filename}.png")
-                    _create_placeholder_image(thumb_path, filename, error_msg)
-                    logger.info(f"Created placeholder image for {filename}")
-                except Exception as placeholder_error:
-                    logger.error(f"Failed to create placeholder: {placeholder_error}")
+                # Create a placeholder image for failures (only for markdown)
+                if create_markdown and vis_dir:
+                    try:
+                        thumb_path = os.path.join(vis_dir, f"{folder_name}_{png_filename}.png")
+                        _create_placeholder_image(thumb_path, filename, error_msg)
+                        logger.info(f"Created placeholder image for {filename}")
+                    except Exception as placeholder_error:
+                        logger.error(f"Failed to create placeholder: {placeholder_error}")
                 
                 # Still collect basic statistics even if visualization fails
                 stats = {
@@ -1101,65 +1162,79 @@ def visualize_task(input_patterns, output_path):
                 }
                 all_stats.append(stats)
     
-    # Write markdown file
-    with open(output_path, 'w') as md_file:
-        # Title
-        md_file.write("# OpenEO Results Visualization\n\n")
-        md_file.write(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+    # Determine output directory and file paths
+    output_dir = os.path.dirname(output_path) if os.path.dirname(output_path) else "."
+    base_name = os.path.splitext(os.path.basename(output_path))[0]
+    
+    # If only PNG format requested, adjust the output path
+    if output_format == "png" and output_path.endswith('.md'):
+        output_path = os.path.join(output_dir, base_name + "_matrix.png")
+    
+    # Create markdown file only if requested
+    if create_markdown:
+        md_path = output_path if output_path.endswith('.md') else os.path.join(output_dir, base_name + ".md")
         
-        # Summary information
-        md_file.write(f"- **Folders processed**: {len(matched_folders)}\n")
-        md_file.write(f"- **Images processed**: {total_images}\n")
-        md_file.write(f"- **Visualization methods available**: {', '.join(visualization_methods)}\n")
-        if errors:
-            md_file.write(f"- **Errors encountered**: {len(errors)}\n")
-        md_file.write("\n")
-        
-        # Image matrix
-        md_file.write("## Visual Matrix of Results\n\n")
-        
-        # Table header with folder name and all filenames
-        md_file.write("| Folder |")
-        for filename in all_filenames:
-            # Truncate very long filenames for display
-            display_name = filename
-            if len(filename) > 25:
-                display_name = filename[:10] + "..." + filename[-12:]
-            md_file.write(f" {display_name} |")
-        md_file.write("\n")
-        
-        # Table separator
-        md_file.write("|" + "---|" * (len(all_filenames) + 1) + "\n")
-        
-        # Table rows with thumbnails
-        for folder_name in sorted(folder_images.keys()):
-            md_file.write(f"| {folder_name} |")
+        with open(md_path, 'w') as md_file:
+            # Title
+            md_file.write("# OpenEO Results Visualization\n\n")
+            md_file.write(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             
-            # Find the thumbnail for each filename
-            for filename in all_filenames:
-                matching_files = [f for f in folder_images[folder_name] if os.path.basename(f) == filename]
-                if matching_files:
-                    # Use basename without extension for the PNG filename
-                    png_filename = os.path.splitext(filename)[0]
-                    thumb_path = os.path.join('visualizations', f"{folder_name}_{png_filename}.png")
-                    md_file.write(f" ![{filename}]({thumb_path}) |")
-                else:
-                    md_file.write(" |")  # Leave blank if no image found
+            # Summary information
+            md_file.write(f"- **Folders processed**: {len(matched_folders)}\n")
+            md_file.write(f"- **Images processed**: {total_images}\n")
+            md_file.write(f"- **Visualization methods available**: {', '.join(visualization_methods)}\n")
+            if errors:
+                md_file.write(f"- **Errors encountered**: {len(errors)}\n")
             md_file.write("\n")
-        
-        # Statistics section
-        md_file.write("\n## Statistics Summary\n\n")
-        md_file.write("Statistics for all GeoTIFF files are available in the accompanying CSV file.\n\n")
-        
-        # Add error summary if there were errors
-        if errors:
-            md_file.write("\n## Processing Errors\n\n")
-            md_file.write("The following errors were encountered during processing:\n\n")
-            for i, error in enumerate(errors[:10]):  # Show only first 10 errors
-                md_file.write(f"{i+1}. {error}\n")
             
-            if len(errors) > 10:
-                md_file.write(f"\n... and {len(errors) - 10} more errors. See log for details.\n")
+            # Image matrix
+            md_file.write("## Visual Matrix of Results\n\n")
+            
+            # Table header with folder name and all filenames
+            md_file.write("| Folder |")
+            for filename in all_filenames:
+                # Truncate very long filenames for display
+                display_name = filename
+                if len(filename) > 25:
+                    display_name = filename[:10] + "..." + filename[-12:]
+                md_file.write(f" {display_name} |")
+            md_file.write("\n")
+            
+            # Table separator
+            md_file.write("|" + "---|" * (len(all_filenames) + 1) + "\n")
+            
+            # Table rows with thumbnails
+            for folder_name in sorted(folder_images.keys()):
+                md_file.write(f"| {folder_name} |")
+                
+                # Find the thumbnail for each filename
+                for filename in all_filenames:
+                    matching_files = [f for f in folder_images[folder_name] if os.path.basename(f) == filename]
+                    if matching_files:
+                        # Use basename without extension for the PNG filename
+                        png_filename = os.path.splitext(filename)[0]
+                        thumb_path = os.path.join('visualizations', f"{folder_name}_{png_filename}.png")
+                        md_file.write(f" ![{filename}]({thumb_path}) |")
+                    else:
+                        md_file.write(" |")  # Leave blank if no image found
+                md_file.write("\n")
+            
+            # Statistics section
+            md_file.write("\n## Statistics Summary\n\n")
+            md_file.write("Statistics for all GeoTIFF files are included in the enhanced visualization below.\n\n")
+            
+            # Add error summary if there were errors
+            if errors:
+                md_file.write("\n## Processing Errors\n\n")
+                md_file.write("The following errors were encountered during processing:\n\n")
+                for i, error in enumerate(errors[:10]):  # Show only first 10 errors
+                    md_file.write(f"{i+1}. {error}\n")
+                
+                if len(errors) > 10:
+                    md_file.write(f"\n... and {len(errors) - 10} more errors. See log for details.\n")
+        
+        logger.info(f"Markdown visualization saved to: {md_path}")
+    
     
     # Structure data for the enhanced visualization functions - folders as columns and files as rows
     folders_data = {}
@@ -1180,29 +1255,86 @@ def visualize_task(input_patterns, output_path):
                     folders_data[folder_name]['stats'][path] = stat
                     break
                     
-            # Find associated thumbnail
-            png_name = f"{folder_name}_{os.path.splitext(filename)[0]}.png"
-            thumb_path = os.path.join(vis_dir, png_name)
-            
-            if os.path.exists(thumb_path):
-                folders_data[folder_name]['thumbnails'][path] = thumb_path
-            else:
-                logger.debug(f"No thumbnail found at {thumb_path} for {filename}")
+            # Find associated thumbnail (only if vis_dir exists)
+            if vis_dir:
+                png_name = f"{folder_name}_{os.path.splitext(filename)[0]}.png"
+                thumb_path = os.path.join(vis_dir, png_name)
+                
+                if os.path.exists(thumb_path):
+                    folders_data[folder_name]['thumbnails'][path] = thumb_path
+                else:
+                    logger.debug(f"No thumbnail found at {thumb_path} for {filename}")
                 
         # Log summary for this folder
         logger.info(f"Folder {folder_name}: {len(file_paths)} files, " + 
                     f"{len(folders_data[folder_name]['stats'])} with stats, " + 
                     f"{len(folders_data[folder_name]['thumbnails'])} with thumbnails")
     
-    # Create the enhanced matrix visualization
-    _create_matrix_visualization(folders_data, output_path, include_stats=True)
+    # Create the enhanced matrix visualization (only for markdown)
+    if create_markdown:
+        _create_matrix_visualization(folders_data, md_path, include_stats=True)
     
-    # Write statistics as CSV with enhanced format (folders as columns)
-    csv_path = os.path.splitext(output_path)[0] + "_stats.csv"
-    _write_statistics_csv(folders_data, csv_path)
+    # Create PNG matrix visualization if requested
+    if create_png:
+        png_output_path = os.path.join(output_dir, base_name + "_matrix.png")
+        try:
+            png_result = create_png_matrix_visualization(folders_data, png_output_path)
+            if png_result:
+                logger.info(f"PNG matrix visualization saved to: {png_result}")
+                # If only PNG was requested, update the output_path to point to the PNG
+                if output_format == "png":
+                    output_path = png_result
+        except Exception as e:
+            logger.warning(f"Could not create PNG matrix visualization: {e}")
     
-    logger.info(f"Visualization complete. Output saved to {output_path}")
-    logger.info(f"Statistics saved to {csv_path}")
+    # Create individual PNG visualizations if requested
+    if png_single or create_png:
+        png_dir = os.path.join(output_dir, 'png_outputs')
+        os.makedirs(png_dir, exist_ok=True)
+        
+        # Get all unique filenames
+        all_unique_files = set()
+        for folder_info in folders_data.values():
+            if isinstance(folder_info, dict) and 'files' in folder_info:
+                for file_path in folder_info['files']:
+                    if file_path.lower().endswith(('.tif', '.tiff')):
+                        all_unique_files.add(os.path.basename(file_path))
+        
+        # Create individual PNGs for each unique filename (using first occurrence)
+        individual_count = 0
+        for filename in all_unique_files:
+            # Find first occurrence of this filename
+            for folder_name, folder_info in folders_data.items():
+                if isinstance(folder_info, dict) and 'files' in folder_info:
+                    for file_path in folder_info['files']:
+                        if os.path.basename(file_path) == filename:
+                            png_single_path = os.path.join(png_dir, f"{os.path.splitext(filename)[0]}_{folder_name}.png")
+                            try:
+                                single_result = create_single_png_visualization(
+                                    file_path, 
+                                    png_single_path, 
+                                    title=f"{filename} ({folder_name})"
+                                )
+                                if single_result:
+                                    individual_count += 1
+                                    logger.debug(f"Individual PNG saved: {single_result}")
+                            except Exception as e:
+                                logger.warning(f"Could not create individual PNG for {filename}: {e}")
+                            break  # Only use first occurrence
+        
+        if individual_count > 0:
+            logger.info(f"Created {individual_count} individual PNG files in {png_dir}")
+    
+    # Final logging based on what was created
+    outputs_created = []
+    if create_markdown:
+        outputs_created.append(f"Markdown: {md_path}")
+    if create_png:
+        outputs_created.append(f"PNG matrix: {png_output_path}")
+    if png_single or create_png:
+        outputs_created.append(f"Individual PNGs: {png_dir}")
+    
+    logger.info(f"Visualization complete. Created: {', '.join(outputs_created)}")
     logger.info(f"Total errors: {len(errors)} out of {total_images} images processed")
     
     # Return success with error count
@@ -1412,6 +1544,278 @@ def save_high_quality_png(image_array, output_path, dpi=300, add_colorbar=False,
     plt.close()
     
     return output_path
+
+def load_geotiff_as_array(file_path):
+    """
+    Load a GeoTIFF file as a numpy array.
+    
+    Args:
+        file_path: Path to the GeoTIFF file
+        
+    Returns:
+        numpy.ndarray: Image array with shape (height, width, bands) or None if failed
+    """
+    if not GDAL_AVAILABLE:
+        logger.error("GDAL is required for loading GeoTIFF files")
+        return None
+    
+    if not NUMPY_AVAILABLE:
+        logger.error("numpy is required for loading GeoTIFF files")
+        return None
+    
+    try:
+        # Open the dataset
+        ds = gdal.Open(file_path)
+        if ds is None:
+            logger.error(f"Could not open {file_path} with GDAL")
+            return None
+        
+        # Get dimensions
+        width = ds.RasterXSize
+        height = ds.RasterYSize
+        band_count = ds.RasterCount
+        
+        if band_count == 0:
+            logger.error(f"No bands found in {file_path}")
+            ds = None
+            return None
+        
+        # Read all bands
+        if band_count == 1:
+            # Single band
+            band = ds.GetRasterBand(1)
+            array = band.ReadAsArray()
+            if array is not None:
+                array = array.reshape(height, width, 1)
+        else:
+            # Multiple bands
+            arrays = []
+            for i in range(1, band_count + 1):
+                band = ds.GetRasterBand(i)
+                band_array = band.ReadAsArray()
+                if band_array is not None:
+                    arrays.append(band_array)
+            
+            if arrays:
+                # Stack bands: (height, width, bands)
+                array = np.stack(arrays, axis=2)
+            else:
+                array = None
+        
+        ds = None  # Close dataset
+        
+        if array is not None:
+            logger.debug(f"Successfully loaded {file_path}: shape {array.shape}, dtype {array.dtype}")
+        else:
+            logger.error(f"Failed to read data from {file_path}")
+            
+        return array
+        
+    except Exception as e:
+        logger.error(f"Error loading GeoTIFF {file_path}: {e}")
+        return None
+
+def create_png_matrix_visualization(folders_data, output_path, max_cols=4, figsize_per_image=(3, 3)):
+    """
+    Create a PNG matrix visualization with all images in a single figure.
+    
+    Args:
+        folders_data: Dict mapping folder names to their data (files, thumbnails, stats)
+        output_path: Path to save the PNG file
+        max_cols: Maximum number of columns in the matrix
+        figsize_per_image: Size of each subplot (width, height) in inches
+        
+    Returns:
+        str: Path to the saved PNG file
+    """
+    if not MATPLOTLIB_AVAILABLE:
+        logger.error("matplotlib is required for PNG matrix visualization")
+        return None
+    
+    # Collect all GeoTIFF files from all folders
+    all_files = []
+    folder_file_map = {}
+    
+    for folder_name, folder_info in folders_data.items():
+        if isinstance(folder_info, dict) and 'files' in folder_info:
+            files = folder_info['files']
+        elif isinstance(folder_info, list):
+            files = folder_info
+        else:
+            continue
+            
+        for file_path in files:
+            if file_path.lower().endswith(('.tif', '.tiff')):
+                filename = os.path.basename(file_path)
+                all_files.append((folder_name, filename, file_path))
+                
+                # Track which folders have which files
+                if filename not in folder_file_map:
+                    folder_file_map[filename] = {}
+                folder_file_map[filename][folder_name] = file_path
+    
+    if not all_files:
+        logger.warning("No GeoTIFF files found for PNG visualization")
+        return None
+    
+    # Calculate grid dimensions
+    total_images = len(all_files)
+    n_cols = min(max_cols, total_images)
+    n_rows = (total_images + n_cols - 1) // n_cols
+    
+    # Create figure
+    fig_width = n_cols * figsize_per_image[0]
+    fig_height = n_rows * figsize_per_image[1]
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(fig_width, fig_height), dpi=100)
+    
+    # Handle single subplot case
+    if total_images == 1:
+        axes = [axes]
+    elif n_rows == 1:
+        axes = [axes] if n_cols == 1 else list(axes)
+    else:
+        axes = axes.flatten()
+    
+    # Plot each image
+    for idx, (folder_name, filename, file_path) in enumerate(all_files):
+        ax = axes[idx]
+        
+        try:
+            # Load and display the image
+            image_array = load_geotiff_as_array(file_path)
+            if image_array is not None:
+                # Apply contrast stretching
+                if image_array.max() > 1000:  # Likely Sentinel-2 reflectance
+                    disp = image_array / 10000.0
+                else:
+                    disp = image_array.copy()
+                
+                disp = contrast_stretch(disp)
+                
+                # Display based on number of bands
+                if len(image_array.shape) == 2 or image_array.shape[-1] == 1:
+                    # Single band - grayscale
+                    if len(image_array.shape) == 3:
+                        disp = disp[..., 0]
+                    ax.imshow(disp, cmap='viridis')
+                elif image_array.shape[-1] == 2:
+                    # Two bands - average
+                    ax.imshow(np.mean(disp, axis=2), cmap='gray')
+                else:
+                    # RGB or more - use first 3 bands
+                    ax.imshow(disp[..., :3])
+                
+                # Set title with folder and filename info
+                short_folder = folder_name[:20] + "..." if len(folder_name) > 23 else folder_name
+                ax.set_title(f"{short_folder}\n{filename}", fontsize=8, pad=2)
+            else:
+                # Could not load image
+                ax.text(0.5, 0.5, f"Could not load\n{filename}", 
+                       transform=ax.transAxes, ha='center', va='center',
+                       fontsize=8, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray"))
+                ax.set_title(f"{folder_name}\n{filename}", fontsize=8, pad=2)
+                
+        except Exception as e:
+            logger.warning(f"Could not load image {file_path}: {e}")
+            ax.text(0.5, 0.5, f"Error loading\n{filename}", 
+                   transform=ax.transAxes, ha='center', va='center',
+                   fontsize=8, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightcoral"))
+            ax.set_title(f"{folder_name}\n{filename}", fontsize=8, pad=2)
+        
+        ax.axis('off')
+    
+    # Hide any unused subplots
+    for idx in range(total_images, len(axes)):
+        axes[idx].axis('off')
+    
+    # Add main title
+    #fig.suptitle('OpenEO Results Comparison', fontsize=14, y=0.98)
+    
+    # Adjust layout and save
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.94)  # Make room for suptitle
+    plt.savefig(output_path, 
+                dpi=300,
+                bbox_inches='tight',
+                pad_inches=0.2,
+                format='png',
+                facecolor='white')
+    plt.close()
+    
+    logger.info(f"PNG matrix visualization saved to: {output_path}")
+    return output_path
+
+def create_single_png_visualization(file_path, output_path, title=None):
+    """
+    Create a PNG visualization for a single GeoTIFF file.
+    
+    Args:
+        file_path: Path to the GeoTIFF file
+        output_path: Path to save the PNG file
+        title: Optional title for the image
+        
+    Returns:
+        str: Path to the saved PNG file
+    """
+    if not MATPLOTLIB_AVAILABLE:
+        logger.error("matplotlib is required for PNG visualization")
+        return None
+    
+    try:
+        # Load the image
+        image_array = load_geotiff_as_array(file_path)
+        if image_array is None:
+            logger.error(f"Could not load image: {file_path}")
+            return None
+        
+        # Create figure
+        plt.figure(figsize=(8, 8), dpi=100)
+        
+        # Apply contrast stretching
+        if image_array.max() > 1000:  # Likely Sentinel-2 reflectance
+            disp = image_array / 10000.0
+        else:
+            disp = image_array.copy()
+        
+        disp = contrast_stretch(disp)
+        
+        # Display based on number of bands
+        if len(image_array.shape) == 2 or image_array.shape[-1] == 1:
+            # Single band - grayscale with colorbar
+            if len(image_array.shape) == 3:
+                disp = disp[..., 0]
+            im = plt.imshow(disp, cmap='viridis')
+            plt.colorbar(im, shrink=0.8, label='Pixel Value')
+        elif image_array.shape[-1] == 2:
+            # Two bands - average with colorbar
+            mean_disp = np.mean(disp, axis=2)
+            im = plt.imshow(mean_disp, cmap='gray')
+            plt.colorbar(im, shrink=0.8, label='Mean Value')
+        else:
+            # RGB or more - use first 3 bands
+            plt.imshow(disp[..., :3])
+        
+        plt.axis('off')
+        if title:
+            plt.title(title, fontsize=14, pad=20)
+        
+        # Save with high quality
+        plt.tight_layout()
+        plt.savefig(output_path, 
+                    dpi=300,
+                    bbox_inches='tight',
+                    pad_inches=0.1,
+                    format='png',
+                    facecolor='white')
+        plt.close()
+        
+        logger.info(f"PNG visualization saved to: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        logger.error(f"Error creating PNG visualization: {e}")
+        return None
+
 def _create_matrix_visualization(folders_data, output_path, include_stats=True):
     """
     Create a matrix visualization markdown file with folders as columns and files as rows.
@@ -1524,11 +1928,7 @@ def _create_matrix_visualization(folders_data, output_path, include_stats=True):
         if include_stats:
             _write_stats_markdown(folders_data, md_file)
     
-    # Also create CSV statistics file
-    csv_path = os.path.splitext(output_path)[0] + "_stats.csv"
-    _write_statistics_csv(folders_data, csv_path)
-    
-    return output_path, csv_path
+    return output_path
 
 
 def _write_stats_markdown(folders_data, md_file):
@@ -1540,7 +1940,7 @@ def _write_stats_markdown(folders_data, md_file):
         md_file: Open file handle for the markdown file
     """
     md_file.write("\n## Statistics Summary\n\n")
-    md_file.write("Statistics for all GeoTIFF files are available in the accompanying CSV file.\n\n")
+    md_file.write("Statistics for all GeoTIFF files are included in the table below.\n\n")
     
     # Create a summary table of key statistics for each folder
     md_file.write("### Complete Statistics Table\n\n")
