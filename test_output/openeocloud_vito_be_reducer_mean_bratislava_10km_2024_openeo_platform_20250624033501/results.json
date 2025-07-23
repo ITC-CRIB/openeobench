@@ -1,0 +1,29 @@
+{
+  "backend_url": "https://openeocloud.vito.be/openeo/1.0.0",
+  "backend_name": "openeocloud_vito_be",
+  "process_graph": "reducer_mean_bratislava_10km_2024_openeo_platform",
+  "status": "success",
+  "job_id": "vito-j-250624033504480c87af9fc32e016fde",
+  "job_status": "finished",
+  "start_time": 1750736101.7853637,
+  "submit_time": 1.4733002185821533,
+  "start_job_time": 1750736104.2203226,
+  "job_execution_time": 233.9895384311676,
+  "download_time": 4.187061548233032,
+  "total_time": 240.61221647262573,
+  "queue_time": 56.686234,
+  "processing_time": 153.598042,
+  "file_path": null,
+  "process_graph_file": "processgraph.json",
+  "error": null,
+  "job_status_history": {
+    "submitted": "2025-06-24T03:35:04.220325",
+    "created": "2025-06-24T03:35:19.642604",
+    "queued": "2025-06-24T03:35:27.800433",
+    "running": "2025-06-24T03:36:24.486667",
+    "finished": "2025-06-24T03:38:58.084709"
+  },
+  "timestamp": "2025-06-24T03:39:02.397584",
+  "download_timestamp": "20250624_033858",
+  "downloads_directory": "output/openeocloud_vito_be_reducer_mean_bratislava_10km_2024_openeo_platform_20250624033501"
+}

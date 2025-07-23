@@ -1,0 +1,27 @@
+{
+  "backend_url": "https://earthengine.openeo.org/v1.0",
+  "backend_name": "earthengine_openeo_org",
+  "process_graph": "ndvi_median_bratislava_10km_2024_earthengine",
+  "status": "success",
+  "job_id": "68uV77RQRSLPoTqr",
+  "job_status": "finished",
+  "start_time": 1750694102.2250435,
+  "submit_time": 0.19313359260559082,
+  "start_job_time": 1750694102.6272657,
+  "job_execution_time": 7.638037204742432,
+  "download_time": 0.1668860912322998,
+  "total_time": 8.207700967788696,
+  "queue_time": null,
+  "processing_time": 7.526758,
+  "file_path": null,
+  "process_graph_file": "processgraph.json",
+  "error": null,
+  "job_status_history": {
+    "submitted": "2025-06-23T15:55:02.627269",
+    "running": "2025-06-23T15:55:02.653948",
+    "finished": "2025-06-23T15:55:10.180706"
+  },
+  "timestamp": "2025-06-23T15:55:10.432749",
+  "download_timestamp": "20250623_155510",
+  "downloads_directory": "output/earthengine_openeo_org_ndvi_median_bratislava_10km_2024_earthengine_20250623155502"
+}

@@ -1,0 +1,29 @@
+{
+  "backend_url": "https://openeo.dataspace.copernicus.eu/openeo/1.2",
+  "backend_name": "openeo_dataspace_copernicus_eu",
+  "process_graph": "reducer_mean_vienna_10km_2024_cdse",
+  "status": "success",
+  "job_id": "j-25062402300345bda77440459a37a90b",
+  "job_status": "finished",
+  "start_time": 1750732202.214236,
+  "submit_time": 0.37746524810791016,
+  "start_job_time": 1750732203.4094937,
+  "job_execution_time": 225.08720231056213,
+  "download_time": 13.042853355407715,
+  "total_time": 239.32595348358154,
+  "queue_time": 83.964832,
+  "processing_time": 120.521351,
+  "file_path": null,
+  "process_graph_file": "processgraph.json",
+  "error": null,
+  "job_status_history": {
+    "submitted": "2025-06-24T02:30:03.409497",
+    "created": "2025-06-24T02:30:16.269532",
+    "queued": "2025-06-24T02:30:23.883368",
+    "running": "2025-06-24T02:31:47.848200",
+    "finished": "2025-06-24T02:33:48.369551"
+  },
+  "timestamp": "2025-06-24T02:34:01.540193",
+  "download_timestamp": "20250624_023348",
+  "downloads_directory": "output/openeo_dataspace_copernicus_eu_reducer_mean_vienna_10km_2024_cdse_20250624023002"
+}

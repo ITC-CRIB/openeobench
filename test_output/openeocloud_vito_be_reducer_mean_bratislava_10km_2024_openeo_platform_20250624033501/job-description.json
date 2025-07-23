@@ -1,0 +1,79 @@
+{
+  "costs": 164,
+  "created": "2025-06-24T03:35:04Z",
+  "id": "vito-j-250624033504480c87af9fc32e016fde",
+  "process": {
+    "process_graph": {
+      "loadcollection1": {
+        "arguments": {
+          "id": "SENTINEL2_L2A",
+          "spatial_extent": {
+            "east": 17.16130266236287,
+            "north": 48.193645045045045,
+            "south": 48.10355495495496,
+            "west": 17.05409733763713
+          },
+          "temporal_extent": [
+            "2024-04-01",
+            "2024-06-30"
+          ]
+        },
+        "process_id": "load_collection"
+      },
+      "reducedimension1": {
+        "arguments": {
+          "data": {
+            "from_node": "loadcollection1"
+          },
+          "dimension": "t",
+          "reducer": {
+            "process_graph": {
+              "mean1": {
+                "arguments": {
+                  "data": {
+                    "from_parameter": "data"
+                  }
+                },
+                "process_id": "mean",
+                "result": true
+              }
+            }
+          }
+        },
+        "process_id": "reduce_dimension"
+      },
+      "saveresult1": {
+        "arguments": {
+          "data": {
+            "from_node": "reducedimension1"
+          },
+          "format": "GTiff",
+          "options": {}
+        },
+        "process_id": "save_result",
+        "result": true
+      }
+    }
+  },
+  "progress": 100,
+  "status": "finished",
+  "updated": "2025-06-24T03:38:56Z",
+  "usage": {
+    "cpu": {
+      "unit": "cpu-seconds",
+      "value": 4080
+    },
+    "duration": {
+      "unit": "seconds",
+      "value": 198
+    },
+    "memory": {
+      "unit": "mb-seconds",
+      "value": 9947751
+    },
+    "sentinelhub": {
+      "unit": "sentinelhub_processing_unit",
+      "value": 1056.0000228881836
+    }
+  }
+}
