@@ -385,12 +385,148 @@ def calculate_statistics_from_files(output_folder, start_date, end_date, output_
         "normalized_times": dict(normalized_times)
     }
 
+def calculate_statistics_from_single_file(csv_file, output_file):
+    """Calculate statistics from a single CSV file"""
+    # Dictionaries to store data for each URL
+    success_counts = defaultdict(int)
+    total_counts = defaultdict(int)
+    response_times = defaultdict(list)
+    normalized_times = defaultdict(list)
+    
+    try:
+        with open(csv_file, 'r') as csvfile:
+            reader = csv.DictReader(csvfile, delimiter=';')
+            
+            for row in reader:
+                url = row['URL']
+                http_code = row['HTTP Code']
+                
+                # Count total requests
+                total_counts[url] += 1
+                
+                # Count successful requests (HTTP 200 codes)
+                if http_code == '200':
+                    success_counts[url] += 1
+                
+                # Collect response times for successful responses
+                try:
+                    response_time = float(row['Response Time (ms)'])
+                    body_size = int(row['Body Size (bytes)'])
+                    
+                    if http_code == '200' and response_time is not None:
+                        response_times[url].append(response_time)
+                        
+                        # Calculate normalized response time (ms/Kbyte)
+                        if body_size > 0:  # Avoid division by zero
+                            norm_time = response_time / (body_size / 1024)
+                            normalized_times[url].append(norm_time)
+                except (ValueError, TypeError):
+                    # Skip if response time or body size is not a valid number
+                    pass
+                    
+    except Exception as e:
+        print(f"Error processing file {csv_file}: {str(e)}")
+        return None
+    
+    # Calculate statistics and write to output file
+    print(f"\nGenerating statistics from: {csv_file}")
+    print(f"Writing results to: {output_file}")
+    
+    # Prepare data for output
+    csv_data = []
+    
+    for url in sorted(total_counts.keys()):
+        total = total_counts[url]
+        success = success_counts[url]
+        success_ratio = (success / total * 100) if total > 0 else 0
+        
+        # Calculate average response time and std dev if available
+        times = response_times[url]
+        avg_time = statistics.mean(times) if times else "N/A"
+        std_dev = statistics.stdev(times) if times and len(times) > 1 else "N/A"
+        
+        # Calculate average normalized response time and std dev if available
+        norm_times = normalized_times[url]
+        avg_norm = statistics.mean(norm_times) if norm_times else "N/A"
+        norm_std_dev = statistics.stdev(norm_times) if norm_times and len(norm_times) > 1 else "N/A"
+        
+        # Add row to data
+        csv_data.append({
+            'URL': url,
+            'Success Ratio (%)': f"{success_ratio:.2f}",
+            'Average Response Time (ms)': f"{avg_time:.2f}" if isinstance(avg_time, float) else avg_time,
+            'Response Time StdDev (ms)': f"{std_dev:.2f}" if isinstance(std_dev, float) else std_dev,
+            'Normalized Response Time (ms/Kbyte)': f"{avg_norm:.6f}" if isinstance(avg_norm, float) else avg_norm,
+            'Normalized Time StdDev (ms/Kbyte)': f"{norm_std_dev:.6f}" if isinstance(norm_std_dev, float) else norm_std_dev
+        })
+    
+    # Print statistics to console
+    for row in csv_data:
+        print(16*"=")
+        print("URL: " + row['URL'])
+        print("Success Ratio: " + row['Success Ratio (%)'])
+        print("Average Response Time: " + row['Average Response Time (ms)'])
+        print("Response Time StdDev: " + row['Response Time StdDev (ms)'])
+        print("Normalized Response Time: " + row['Normalized Response Time (ms/Kbyte)'])
+        print("Normalized Time StdDev: " + row['Normalized Time StdDev (ms/Kbyte)'])
+
+    print()
+    
+    # Create output directory if it doesn't exist
+    output_dir = os.path.dirname(output_file)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Determine output format from file extension
+    if output_file.endswith('.md'):
+        # Write Markdown format
+        with open(output_file, 'w') as f:
+            f.write("# OpenEO Service Summary\n\n")
+            f.write(f"Summary statistics from: {os.path.basename(csv_file)}\n\n")
+            f.write("| URL | Success Ratio (%) | Avg Response Time (ms) | Response Time StdDev (ms) | Normalized Response Time (ms/Kbyte) | Normalized Time StdDev (ms/Kbyte) |\n")
+            f.write("|-----|-------------------|------------------------|---------------------------|-------------------------------------|-----------------------------------|\n")
+            
+            for row in csv_data:
+                f.write(f"| {row['URL']} | {row['Success Ratio (%)']} | {row['Average Response Time (ms)']} | {row['Response Time StdDev (ms)']} | {row['Normalized Response Time (ms/Kbyte)']} | {row['Normalized Time StdDev (ms/Kbyte)']} |\n")
+        
+        print(f"Markdown file created successfully: {output_file}")
+    else:
+        # Write CSV format
+        with open(output_file, 'w', newline='') as csvfile:
+            fieldnames = ['URL', 'Success Ratio (%)', 'Average Response Time (ms)', 'Response Time StdDev (ms)', 
+                         'Normalized Response Time (ms/Kbyte)', 'Normalized Time StdDev (ms/Kbyte)']
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(csv_data)
+        print(f"CSV file created successfully: {output_file}")
+    
+    return {
+        "success_counts": dict(success_counts),
+        "total_counts": dict(total_counts),
+        "response_times": dict(response_times),
+        "normalized_times": dict(normalized_times)
+    }
+
 def calculate_statistics_flexible(input_paths, output_file, start_date=None, end_date=None):
     """
     Flexible statistics calculation that can work with different input formats.
     This is a compatibility function for the openeobench CLI.
     """
-    return calculate_statistics_from_files(input_paths[0] if input_paths else output_file, start_date, end_date, output_file)
+    if not input_paths:
+        return None
+    
+    input_path = input_paths[0]
+    
+    # Check if input is a directory or a file
+    if os.path.isdir(input_path):
+        # If it's a directory, use the existing function
+        return calculate_statistics_from_files(input_path, start_date, end_date, output_file)
+    elif os.path.isfile(input_path) and input_path.endswith('.csv'):
+        # If it's a CSV file, process it directly
+        return calculate_statistics_from_single_file(input_path, output_file)
+    else:
+        print(f"Error: Input path '{input_path}' is not a valid directory or CSV file")
+        return None
 
 def run_openeo_scenario(api_url, input_path, output_directory=None):
     """
