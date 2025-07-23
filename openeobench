@@ -320,7 +320,8 @@ Examples:
             return 1
 
         # Calculate statistics and write to file
-        success = calculate_statistics_flexible(args.input, args.output)
+        # Note: calculate_statistics_flexible expects a list, so wrap single input in a list
+        success = calculate_statistics_flexible([args.input], args.output)
         if not success:
             return 1
 

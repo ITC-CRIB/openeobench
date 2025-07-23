@@ -258,6 +258,10 @@ def parse_date(date_str):
 
 def is_file_in_date_range(filename, start_date, end_date):
     """Check if the file is within the specified date range"""
+    # If no date range specified, include all files
+    if start_date is None or end_date is None:
+        return True
+        
     try:
         # Extract date from filename (assuming YYYY-MM-DD format at the beginning)
         date_str = filename[:10]  # Get the first 10 characters (YYYY-MM-DD)
