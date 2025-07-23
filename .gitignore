@@ -5,6 +5,9 @@ scenario_runner.log
 output
 testing
 test
+test_output
+*.log
+results/
 
 # Python cache files
 __pycache__/
