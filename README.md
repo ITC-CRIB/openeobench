@@ -53,6 +53,9 @@ pip install -r requirements.txt
 python openeobench --help
 ```
 
+> **Note:**
+> When installing GDAL, make sure that the system GDAL library version and the Python GDAL package version are compatible. Mismatched versions can cause import errors or runtime issues. It is recommended to install the system GDAL libraries first, then install the matching Python GDAL version (e.g., using `pip install gdal==<version>` where `<version>` matches your system GDAL).
+
 ## Usage
 
 ### Service Checking
