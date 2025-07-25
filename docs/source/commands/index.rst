@@ -1,7 +1,7 @@
 Commands Reference
 ==================
 
-Complete reference for all OpenEO Bench commands.
+Complete reference for all openEObench commands.
 
 .. toctree::
    :maxdepth: 2

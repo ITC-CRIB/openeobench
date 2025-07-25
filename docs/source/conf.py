@@ -6,7 +6,7 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'OpenEO Bench'
+project = 'openEObench'
 copyright = '2025, ITC-CRIB'
 author = 'ITC-CRIB'
 release = '0.1.0'

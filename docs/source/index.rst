@@ -1,7 +1,7 @@
-OpenEO Bench Documentation
+openEObench Documentation
 ===========================
 
-Welcome to **OpenEO Bench**, a comprehensive benchmarking and testing tool for OpenEO backends and services.
+Welcome to **openEObench**, a comprehensive benchmarking and testing tool for OpenEO backends and services.
 
 .. warning::
    This project is under active development.

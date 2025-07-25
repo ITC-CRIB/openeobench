@@ -42,7 +42,7 @@ import datetime
 
 def main():
     parser = argparse.ArgumentParser(
-        description="OpenEO Bench - Benchmarking and testing tool for OpenEO endpoints",
+        description="openEObench - Benchmarking and testing tool for OpenEO endpoints",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:

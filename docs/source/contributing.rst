@@ -1,7 +1,7 @@
 Contributing
 ============
 
-We welcome contributions to OpenEO Bench! This guide will help you get started.
+We welcome contributions to openEObench! This guide will help you get started.
 
 Development Setup
 -----------------
@@ -205,4 +205,4 @@ Development Workflow
 7. **Address review feedback** promptly
 8. **Celebrate** when your contribution is merged! 🎉
 
-Thank you for contributing to OpenEO Bench!
+Thank you for contributing to openEObench!

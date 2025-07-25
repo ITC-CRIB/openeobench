@@ -1,7 +1,7 @@
 API Reference
 =============
 
-Detailed API documentation for OpenEO Bench modules.
+Detailed API documentation for openEObench modules.
 
 .. note::
    This section will be automatically generated from code docstrings using Sphinx autodoc.

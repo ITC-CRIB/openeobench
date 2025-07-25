@@ -1,4 +1,4 @@
-# OpenEO Bench
+# openEObench
 
 **⚠️ This project is under active development.**
 
@@ -6,7 +6,7 @@ A comprehensive benchmarking and testing tool for OpenEO backends and services.
 
 ## Overview
 
-OpenEO Bench provides comprehensive functionality for testing and benchmarking OpenEO backends:
+openEObench provides comprehensive functionality for testing and benchmarking OpenEO backends:
 
 - **Service Checking**: Test endpoint availability and response times
 - **Scenario Execution**: Run OpenEO workflows on backends  

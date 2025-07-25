@@ -1,7 +1,7 @@
 Basic Workflow
 ==============
 
-This example demonstrates a complete OpenEO Bench workflow from service checking to result visualization.
+This example demonstrates a complete openEObench workflow from service checking to result visualization.
 
 Step 1: Check Service Availability
 -----------------------------------

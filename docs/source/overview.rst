@@ -1,7 +1,7 @@
 Overview
 ========
 
-OpenEO Bench provides comprehensive functionality for testing and benchmarking OpenEO backends:
+openEObench provides comprehensive functionality for testing and benchmarking OpenEO backends:
 
 Core Features
 -------------
@@ -18,7 +18,7 @@ Core Features
 Architecture
 ------------
 
-OpenEO Bench is designed as a modular command-line tool that can:
+openEObench is designed as a modular command-line tool that can:
 
 1. **Test Backend Availability**: Monitor OpenEO service endpoints
 2. **Execute Workflows**: Run predefined or custom OpenEO scenarios

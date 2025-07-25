@@ -1,6 +1,6 @@
 # Setting Up Documentation with Read the Docs
 
-This guide helps you set up OpenEO Bench documentation with Read the Docs using `uv`.
+This guide helps you set up openEObench documentation with Read the Docs using `uv`.
 
 ## Local Development
 
@@ -162,22 +162,6 @@ html_js_files = ['custom.js']
 html_logo = '_static/logo.png'
 html_favicon = '_static/favicon.ico'
 ```
-
-## Automation
-
-### GitHub Actions
-
-The `.github/workflows/docs.yml` file provides:
-- Automatic builds on push
-- Deployment to GitHub Pages
-- Build status checks
-
-### Read the Docs Webhooks
-
-RTD automatically builds when:
-- Code is pushed to configured branches
-- Pull requests are created
-- Tags are created
 
 ## Troubleshooting
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OpenEO Bench Command Testing Script
+openEObench Command Testing Script
 
 This script tests all commands defined in the "Usage" section of README.md.
 It executes each command using subprocess and logs the results to a file.
@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class CommandTester:
-    """Class to test OpenEO Bench commands"""
+    """Class to test openEObench commands"""
     
     def __init__(self):
         self.base_dir = Path.cwd()
@@ -336,7 +336,7 @@ ndvi,L2,available,compatible,Process available and compatible
     def run_all_tests(self):
         """Run all command tests"""
         logger.info("=" * 80)
-        logger.info("Starting OpenEO Bench Command Tests")
+        logger.info("Starting openEObench Command Tests")
         logger.info("=" * 80)
         
         results = {}

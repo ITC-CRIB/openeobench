@@ -1,7 +1,7 @@
 Visualization Examples
 ====================
 
-This section demonstrates various visualization capabilities of OpenEO Bench for analyzing and presenting results.
+This section demonstrates various visualization capabilities of openEObench for analyzing and presenting results.
 
 Basic Result Visualization
 ---------------------------
@@ -471,7 +471,7 @@ Create an interactive HTML dashboard:
    <!DOCTYPE html>
    <html>
    <head>
-       <title>OpenEO Bench Interactive Dashboard</title>
+       <title>openEObench Interactive Dashboard</title>
        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
        <style>
            body {{ font-family: Arial, sans-serif; margin: 20px; }}
@@ -487,7 +487,7 @@ Create an interactive HTML dashboard:
        </style>
    </head>
    <body>
-       <h1>OpenEO Bench Dashboard</h1>
+       <h1>openEObench Dashboard</h1>
        <p>Last updated: <span id="lastUpdate"></span></p>
        
        <div class="dashboard-section">
@@ -626,7 +626,7 @@ Combine all visualization tools into a single pipeline:
    # Setup output directory
    mkdir -p visualizations/{matrices,reports,custom,interactive}
    
-   # 1. Standard OpenEO Bench visualizations
+   # 1. Standard openEObench visualizations
    echo "Step 1: Creating standard visualizations..."
    openeobench visualize results/*/ --output visualizations/complete_results.md --format both
    
@@ -645,7 +645,7 @@ Combine all visualization tools into a single pipeline:
    # 5. Generate comprehensive report
    echo "Step 5: Generating comprehensive report..."
    cat > visualizations/comprehensive_report.md << EOF
-   # OpenEO Bench Comprehensive Visualization Report
+   # openEObench Comprehensive Visualization Report
    
    Generated: $(date)
    

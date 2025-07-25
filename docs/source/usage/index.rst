@@ -1,7 +1,7 @@
 Usage Guide
 ===========
 
-This section provides detailed usage instructions for all OpenEO Bench features.
+This section provides detailed usage instructions for all openEObench features.
 
 .. toctree::
    :maxdepth: 2

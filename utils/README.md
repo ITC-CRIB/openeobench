@@ -1,6 +1,6 @@
-# OpenEO Bench Utilities
+# openEObench Utilities
 
-This directory contains utility scripts and documentation for the OpenEO benchmarking project.
+This directory contains utility scripts and documentation for the openEObenchmarking project.
 
 ## Utility Scripts
 
