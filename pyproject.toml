@@ -1,5 +1,5 @@
 [project]
-name = "openeo-checker"
+name = "openeobench"
 version = "0.1.0"
 description = "A comprehensive benchmarking and testing tool for OpenEO backends and services"
 readme = "README.md"
