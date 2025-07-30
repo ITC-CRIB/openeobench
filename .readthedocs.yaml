@@ -10,9 +10,8 @@ build:
   jobs:
     pre_build:
       - curl -LsSf https://astral.sh/uv/install.sh | sh
-      - export PATH="$HOME/.cargo/bin:$PATH"
-      - uv sync --extra docs
-      - uv pip install -e .
+      - $HOME/.cargo/bin/uv sync --extra docs
+      - $HOME/.cargo/bin/uv pip install -e .
 
 sphinx:
   configuration: docs/source/conf.py
