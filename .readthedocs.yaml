@@ -8,11 +8,9 @@ build:
   tools:
     python: "3.11"
   jobs:
-    pre_create_environment:
+    pre_build:
       - curl -LsSf https://astral.sh/uv/install.sh | sh
       - export PATH="$HOME/.cargo/bin:$PATH"
-      - . $HOME/.local/bin/env
-    pre_build:
       - uv sync --extra docs
       - uv pip install -e .
 
