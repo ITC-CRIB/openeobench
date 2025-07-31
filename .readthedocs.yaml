@@ -15,7 +15,7 @@ build:
     pre_build:
       - python -m pip install uv
       - uv sync --extra docs
-      - uv pip install -e .
+      - uv pip install -e .[docs]
 
 sphinx:
   configuration: docs/source/conf.py
