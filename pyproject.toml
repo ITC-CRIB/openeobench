@@ -36,3 +36,6 @@ openeo-checker = "openeo_checker:main"
 process-checker = "process_checker:main"
 process-summary = "process_summary:main"
 openeotest = "openeotest:main"
+
+[tool.setuptools.packages.find]
+exclude = ["outputs", "scenarios", "test_output", "advanced_scenarios"]
