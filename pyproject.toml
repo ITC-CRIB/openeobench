@@ -30,5 +30,9 @@ dev = [
     "pre-commit>=3.0.0",
 ]
  
-[tool.setuptools]
-py_modules = ["openeo_checker", "process_checker", "process_summary", "openeotest"]
+
+[project.scripts]
+openeo-checker = "openeo_checker:main"
+process-checker = "process_checker:main"
+process-summary = "process_summary:main"
+openeotest = "openeotest:main"
