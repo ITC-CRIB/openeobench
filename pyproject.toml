@@ -31,4 +31,4 @@ dev = [
 ]
  
 [tool.setuptools]
-packages = ["openeobench"]
+py_modules = ["openeo_checker", "process_checker", "process_summary", "openeotest"]
