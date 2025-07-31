@@ -29,3 +29,6 @@ dev = [
     "flake8>=6.0.0",
     "pre-commit>=3.0.0",
 ]
+ 
+[tool.setuptools]
+packages = ["openeobench"]
