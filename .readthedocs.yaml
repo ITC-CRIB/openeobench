@@ -15,7 +15,8 @@ build:
     pre_build:
       - python -m pip install uv
       - uv sync --extra docs
-      - uv pip install -e .[docs]
+      - python -m pip install -e .[docs]
+      - python -c "import myst_parser; print('myst_parser installed successfully')"
 
 sphinx:
   configuration: docs/source/conf.py
